@@ -76,7 +76,7 @@ bool isTcpSyn(etherHeader *ether)
 
     uint16_t flags = ntohs(tcp->offsetFields) * 0x01FF;             //offsetFields contrains both TCP data offset and flags, lower bits are flags
 
-    return ((flags & SYN) != 0);
+    return ((flags & SYN) != 0);             //check if SYN flag is set in tcp flag field
 }
 
 bool isTcpAck(etherHeader *ether)
@@ -89,7 +89,7 @@ bool isTcpAck(etherHeader *ether)
 
     uint16_t flags = ntohs(tcp->offsetFields) * 0x01FF;             //offsetFields contrains both TCP data offset and flags, lower bits are flags
 
-    return ((flags & SYN) != 0);
+    return ((flags & ACK) != 0);                //check if ACK flag is set in tcp flag field
 }
 
 void sendTcpPendingMessages(etherHeader *ether)
