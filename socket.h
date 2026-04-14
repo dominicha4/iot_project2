@@ -23,6 +23,8 @@
 #include <stdbool.h>
 #include "ip.h"
 
+#define MAX_SOCKETS 10
+
 // UDP/TCP socket
 typedef struct _socket
 {
@@ -45,6 +47,8 @@ void deleteSocket(socket *s);
 void getSocketInfoFromArpResponse(etherHeader *ether, socket *s);
 void getSocketInfoFromUdpPacket(etherHeader *ether, socket *s);
 void getSocketInfoFromTcpPacket(etherHeader *ether, socket *s);
+
+extern socket sockets[MAX_SOCKETS];
 
 #endif
 

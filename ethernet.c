@@ -604,6 +604,8 @@ int main(void)
                         if (isTcpPortOpen(data))
                         {
                             putsUart0("TCP port is open\r\n");
+                            putsUart0("Calling processTcpResponse\r\n");
+                            processTcpResponse(data);
                         }
                         else
                         {

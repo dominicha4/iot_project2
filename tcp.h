@@ -26,15 +26,15 @@
 
 typedef struct _tcpHeader // 20 or more bytes
 {
-  uint16_t sourcePort;
-  uint16_t destPort;
-  uint32_t sequenceNumber;
-  uint32_t acknowledgementNumber;
-  uint16_t offsetFields;
-  uint16_t windowSize;
-  uint16_t checksum;
-  uint16_t urgentPointer;
-  uint8_t  data[0];
+    uint16_t sourcePort;
+    uint16_t destPort;
+    uint32_t sequenceNumber;
+    uint32_t acknowledgementNumber;
+    uint16_t offsetFields;
+    uint16_t windowSize;
+    uint16_t checksum;
+    uint16_t urgentPointer;
+    uint8_t data[0];
 } tcpHeader;
 
 // TCP states
@@ -79,8 +79,9 @@ void processTcpArpResponse(etherHeader *ether);
 
 void setTcpPortList(uint16_t ports[], uint8_t count);
 bool isTcpPortOpen(etherHeader *ether);
-void sendTcpResponse(etherHeader *ether, socket* s, uint16_t flags);
-void sendTcpMessage(etherHeader *ether, socket* s, uint16_t flags, uint8_t data[], uint16_t dataSize);
+void sendTcpResponse(etherHeader *ether, socket *s, uint16_t flags);
+void sendTcpMessage(etherHeader *ether, socket *s, uint16_t flags,
+                    uint8_t data[], uint16_t dataSize);
 
 #endif
 
