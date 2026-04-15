@@ -23,7 +23,9 @@
 #include <stdbool.h>
 #include "tcp.h"
 
-socket *mqttSocket;
+extern socket *mqttSocket;
+extern bool mqttConnected;     // MQTT connection state
+extern bool mqttConnectSent;   // Used to prevent it from sending another. Maybe used
 
 //-----------------------------------------------------------------------------
 // Subroutines

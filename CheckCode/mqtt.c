@@ -27,6 +27,8 @@
 // ------------------------------------------------------------------------------
 
 socket *mqttSocket = NULL;
+bool mqttConnected = false;     // MQTT connection state
+bool mqttConnectSent = false;   // Used to prevent it from sending another. Maybe used
 
 // ------------------------------------------------------------------------------
 //  Structures
