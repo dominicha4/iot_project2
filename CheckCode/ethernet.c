@@ -345,7 +345,8 @@ void processShell()
 
                     if (mqttSocket != NULL)
                     {
-                        mqttSocket->mqttConnected = false; // RESETS if failed
+                        mqttConnected = false;      //
+                        mqttConnectSent = false;
                         putsUart0("TCP connect started, waiting for handshake...\r\n");
                     }
                 }
@@ -551,17 +552,16 @@ int main(void)
         // TCP maintenance (empty for now, but we leave the call here)
         sendTcpPendingMessages(data);
 
-        if (mqttSocket != NULL)
+
+        // Checks if TCP is Established and MQTT has not been sent
+        if (mqttSocket != NULL && mqttSocket->state == TCP_ESTABLISHED &&
+            !mqttConnectSent)
         {
-            // Checks if TCP is Established and MQTT has not been sent
-            if (mqttSocket->state == TCP_ESTABLISHED &&
-                mqttSocket->mqttConnected == false)
-            {
-                putsUart0("Sending MQTT CONNECT...\r\n");
-                connectMqtt(mqttSocket);
-                mqttSocket->mqttConnected = true;
-            }
+            putsUart0("Sending MQTT CONNECT...\r\n");
+            connectMqtt(mqttSocket);
+            mqttConnectSent = true;   // Set to true to not send another
         }
+
 
         // only process packets if something arrived
         if (isEtherDataAvailable())

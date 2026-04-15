@@ -22,6 +22,7 @@
 #include "tcp.h"
 #include "timer.h"
 #include "uart0.h"
+#include "mqtt.h"
 #include <stdint.h>
 #include <stdlib.h>
 
@@ -188,25 +189,25 @@ void processTcpResponse(etherHeader *ether)
     }
 
     // If TCP connect has been established, check socket for MQTT CONNACK
-    if (s->state == TCP_ESTABLISHED)
+    if(s != NULL && s->state == TCP_ESTABLISHED)
     {
-        if (tcp->sourcePort == htons(s->remotePort))
+        if(tcp->sourcePort == htons(s->remotePort))
         {
             uint8_t *payload = tcp->data;
 
-            if (payload[0] == 0x20) // If MQTT CONNACK has been received
+            if(payload[0] == 0x20) // If MQTT CONNACK has been received
             {
                 putsUart0("MQTT CONNACK received\r\n");
 
-                if (payload[3] == 0x00) // Check for success
+                if(payload[3] == 0x00) // Check for success
                 {
                     putsUart0("MQTT SUCCESS\r\n");
+                    mqttConnected = true; // optional safety lock
                 }
                 else    // Otherwise, failed
                 {
                     putsUart0("MQTT FAILED\r\n");
                 }
-                s->mqttConnected = true; // optional safety lock
             }
         }
     }
@@ -374,7 +375,7 @@ socket* tcpConnect(uint8_t ip[], uint16_t port)
     putsUart0("Starting TCP connection...\r\n");
 
     // Copies broker ip address into socket
-    memcpy(s->remoteIp, ip, 4);
+    memcpy(s->remoteIpAddress, ip, 4);
     // Set destination port to 1883 for mqtt
     s->remotePort = port;
     // Chooses a random high number
