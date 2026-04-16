@@ -336,19 +336,8 @@ void processShell()
                 token = strtok(NULL, " ");
                 if (strcmp(token, "connect") == 0)
                 {
-                    uint8_t ip[4];
-                    getIpMqttBrokerAddress(ip);
-
-                    // Uses board as client and sets the broker(mosquitto) as server
-                    // Starts TCP connection and delays until established. Connects to Mqtt once established in main
-                    mqttSocket = tcpConnect(ip, 1883);
-
-                    if (mqttSocket != NULL)
-                    {
-                        mqttConnected = false;      //
-                        mqttConnectSent = false;
-                        putsUart0("TCP connect started, waiting for handshake...\r\n");
-                    }
+                    connectMqtt();
+                    putsUart0("CONNECTING TO MQTT\r\n");
                 }
                 if (strcmp(token, "disconnect") == 0)
                 {
@@ -551,17 +540,6 @@ int main(void)
 
         // TCP maintenance (empty for now, but we leave the call here)
         sendTcpPendingMessages(data);
-
-
-        // Checks if TCP is Established and MQTT has not been sent
-        if (mqttSocket != NULL && mqttSocket->state == TCP_ESTABLISHED &&
-            !mqttConnectSent)
-        {
-            putsUart0("Sending MQTT CONNECT...\r\n");
-            connectMqtt(mqttSocket);
-            mqttConnectSent = true;   // Set to true to not send another
-        }
-
 
         // only process packets if something arrived
         if (isEtherDataAvailable())

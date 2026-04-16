@@ -45,6 +45,12 @@ uint8_t tcpState[MAX_TCP_PORTS];
 // Subroutines
 //-----------------------------------------------------------------------------
 
+// Get socket
+socket *getsocket(uint8_t instance)
+{
+    return &sockets[instance];
+}
+
 // Set TCP state
 void setTcpState(uint8_t instance, uint8_t state)
 {
@@ -109,10 +115,10 @@ void processTcpResponse(etherHeader *ether)
 
     putsUart0("Entered processTcpResponse\r\n");
 
-    if (!isTcp(ether))
+    if (!isTcp(ether)) //check if packet is TCP packet
     {
         putsUart0("Not TCP\n");
-        return;                 //check if packet is TCP packet
+        return;
     }
 
     if (!isTcpPortOpen(ether)) //if TCP packet is not going to open port, then ignore it
@@ -128,20 +134,8 @@ void processTcpResponse(etherHeader *ether)
     // Extracts source and destination TCP ports from incoming packets
     uint16_t srcPort = ntohs(tcp->sourcePort);
     uint16_t dstPort = ntohs(tcp->destPort);
+    uint16_t offsetFields = ntohs(tcp->offsetFields);
 
-    for (i = 0; i < MAX_SOCKETS; i++)   // Iterate and finds the matching TCP socket
-    {
-        if (sockets[i].state != TCP_CLOSED) // Skips invalid sockets
-        {
-            // Checks for matching source and destination port
-            if (sockets[i].localPort == dstPort &&
-                sockets[i].remotePort == srcPort)
-            {
-                s = &sockets[i];
-                break;
-            }
-        }
-    }
     //checks for the first step of TCP, client sends SYN and is trying to start a new connection
     if (isTcpSyn(ether) && !isTcpAck(ether))
     {
@@ -169,10 +163,11 @@ void processTcpResponse(etherHeader *ether)
         s->sequenceNumber++;    //SYN consumes one sequence number
     }
     //this checks for the last step of TCP handshake, client sends ack after receiving our SYN+ACK
-    else if (isTcpAck(ether) && !isTcpSyn(ether))
+    else if(isTcpAck(ether) && !isTcpSyn(ether))
     {
         putsUart0("Final ACK received\r\n");
 
+        //looks through sockets for matching connection
         for (i = 0; i < MAX_SOCKETS; i++)
         {
             if (sockets[i].state == TCP_SYN_RECEIVED) //only chekcs sockets that are waiting for the final ACK
@@ -188,27 +183,92 @@ void processTcpResponse(etherHeader *ether)
         }
     }
 
-    // If TCP connect has been established, check socket for MQTT CONNACK
-    if(s != NULL && s->state == TCP_ESTABLISHED)
+    else if(isTcpAck(ether)) //general ack based traffic for SYN-ACK, FIN, etc
     {
-        if(tcp->sourcePort == htons(s->remotePort))
+        //Extracts TCP header length from upper 4 bits of offset field
+        uint16_t rawOffsetFields = ntohs(tcp->offsetFields);
+
+        //The top 4 bits of offsetFields specify the number of 4-byte words
+        uint8_t tcpHeaderLength = (rawOffsetFields >> 12) * 4;
+        //Computes the payload size of IP length minus the headers
+        uint16_t dataSize = ntohs(ip->length) - ipHeaderLength - tcpHeaderLength;
+
+        if(isTcpSyn(ether)) //SYN-ACK response handling
         {
-            uint8_t *payload = tcp->data;
+            //Updates ACK number using server sequence number
+            s->acknowledgementNumber += (ntohl(tcp->sequenceNumber) + 1);
+            //sends ACK back to server
+            sendTcpMessage(ether, s, ACK, NULL, 0);
+        }
+        else if((FIN & offsetFields) == FIN) //Terminating the Connection
+        {
+            uint8_t state = getTcpState(0);
 
-            if(payload[0] == 0x20) // If MQTT CONNACK has been received
+            if(state == TCP_ESTABLISHED) //Other device closes the connection
             {
-                putsUart0("MQTT CONNACK received\r\n");
+                s->acknowledgementNumber += 1;
 
-                if(payload[3] == 0x00) // Check for success
-                {
-                    putsUart0("MQTT SUCCESS\r\n");
-                    mqttConnected = true; // optional safety lock
-                }
-                else    // Otherwise, failed
-                {
-                    putsUart0("MQTT FAILED\r\n");
-                }
+                //Reply with FIN+ACK to close request
+                sendTcpMessage(ether, s, FIN | ACK, NULL, 0);
+
+                s->sequenceNumber += 1;
+                setTcpState(0, TCP_CLOSE_WAIT);
             }
+
+            else if(state == TCP_FIN_WAIT_1) //We finish the active closing sequence
+            {
+                s->acknowledgementNumber += 1;
+                //Other device ACK
+                sendTcpMessage(ether, s, ACK, NULL, 0);
+
+                //Send funal FIN
+                sendTcpMessage(ether, s, FIN | ACK, NULL, 0);
+
+                setTcpState(0, TCP_CLOSED);
+            }
+            else if ((offsetFields & PSH) == PSH) //Processing MQTT
+            {
+                uint8_t *data = tcp->data;
+                uint8_t buffer[100] = {0};
+
+                //Copy the payload into the buffer
+                memcpy(buffer, data, dataSize);
+
+                //MQTT control packet type from upper 4 bits of the 1st byte
+                uint8_t flag = buffer[0] >> 4;
+
+                if (flag == 2) // CONNACK RECEIVED
+                {
+                    // set the flag for MQTT_CONNECTED
+                    setTcpState(1, MQTT_CONNECTED);
+                    putsUart0("MQTT CONNECTED!!!\n\r");
+                }
+                else if (flag == 3) // PUBLISH
+                {
+                                    }
+                else if (flag == 9) // SUBACK
+                {
+
+                }
+                else if (flag == 12) // PUBACK
+                {
+
+                }
+                else if (flag == 11) // UNSUBACK
+                {
+
+                }
+                //else return;
+                s->acknowledgementNumber += dataSize; // update ack number
+                sendTcpMessage(ether, s, ACK, NULL, 0);
+            }
+
+        }
+
+        //Reset packets from connection error or abort
+        else if ((offsetFields & RST) == RST)
+        {
+            setTcpState(0, TCP_CLOSED);
         }
     }
 }
@@ -286,6 +346,16 @@ void sendTcpMessage(etherHeader *ether, socket *s, uint16_t flags,
     memcpy(ether->sourceAddress, tempMac, 6);
     putsUart0("MAC addresses swapped\r\n");
 
+    // Fill IP Header
+    ip->rev = 0x4;                     // IPv4
+    ip->size = 0x5;                    // 5 * 4 = 20 bytes (standard IP header size)
+    ip->typeOfService = 0;             // No special handling
+    ip->id = 0;                        // Identification (0 for now)
+    ip->flagsAndOffset = 0;            // No fragmentation
+    ip->ttl = 128;                     // Time to live
+    ip->protocol = PROTOCOL_TCP;       // TCP protocol
+    ip->headerChecksum = 0;            // Checksum (calculated later)
+
     //swap source and destination IP addresses so reply goes back to the other device
     uint8_t tempIp[4];
     memcpy(tempIp, ip->sourceIp, 4);
@@ -361,37 +431,4 @@ void sendTcpMessage(etherHeader *ether, socket *s, uint16_t flags,
     //send the ethernet frame
     putEtherPacket(ether, sizeof(etherHeader) + totalIpLength);
     putsUart0("TCP packet sent\r\n");
-}
-
-socket* tcpConnect(uint8_t ip[], uint16_t port)
-{
-    socket *s = newSocket();    // Allocates a free socket
-    if (s == NULL)  // If no sockets are available or fails (safety check)
-    {
-        putsUart0("No free socket for TCP connect\r\n");
-        return NULL;
-    }
-
-    putsUart0("Starting TCP connection...\r\n");
-
-    // Copies broker ip address into socket
-    memcpy(s->remoteIpAddress, ip, 4);
-    // Set destination port to 1883 for mqtt
-    s->remotePort = port;
-    // Chooses a random high number
-    s->localPort = 50000 + (rand() % 1000);   // random high port
-
-    s->sequenceNumber = 1;      // Initial sequence
-    s->acknowledgementNumber = 0;
-    s->state = TCP_SYN_SENT;
-
-    uint8_t buffer[1518] = {};
-    etherHeader *data = (etherHeader*) buffer;
-
-    // Send TCPSYN to initiate 3 way handshake
-    sendTcpMessage(data, s, SYN, NULL, 0);
-
-    putsUart0("SYN sent\r\n");
-
-    return s;
 }

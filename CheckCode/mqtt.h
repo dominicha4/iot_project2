@@ -23,15 +23,11 @@
 #include <stdbool.h>
 #include "tcp.h"
 
-extern socket *mqttSocket;
-extern bool mqttConnected;     // MQTT connection state
-extern bool mqttConnectSent;   // Used to prevent it from sending another. Maybe used
-
 //-----------------------------------------------------------------------------
 // Subroutines
 //-----------------------------------------------------------------------------
 
-void connectMqtt(socket *s);
+void connectMqtt();
 void disconnectMqtt();
 void publishMqtt(char strTopic[], char strData[]);
 void subscribeMqtt(char strTopic[]);

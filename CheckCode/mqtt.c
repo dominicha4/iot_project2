@@ -26,10 +26,6 @@
 //  Globals
 // ------------------------------------------------------------------------------
 
-socket *mqttSocket = NULL;
-bool mqttConnected = false;     // MQTT connection state
-bool mqttConnectSent = false;   // Used to prevent it from sending another. Maybe used
-
 // ------------------------------------------------------------------------------
 //  Structures
 // ------------------------------------------------------------------------------
@@ -40,6 +36,9 @@ bool mqttConnectSent = false;   // Used to prevent it from sending another. Mayb
 
 void connectMqtt(socket *s)
 {
+    uint8_t buffer[1518];
+    etherHeader *data = (etherHeader*) buffer;
+
     uint8_t mqttData[100] = {};     // MQTT data initialized to NULL
     uint16_t mqttDataSize = 0;      // sendTcpMessage expects uint16
 
@@ -70,12 +69,7 @@ void connectMqtt(socket *s)
     mqttData[mqttDataSize++] = 'A';     // Client ID
     mqttData[mqttDataSize++] = 'M';     // Client ID
 
-    // Make Ether
-    uint8_t buffer[1518];
-    etherHeader *data = (etherHeader*) buffer;
-
-    sendTcpMessage(data, s, PSH | ACK, mqttData, mqttDataSize);
-
+    sendTcpMessage(data, getsocket(0), PSH | ACK, mqttData, mqttDataSize);
 }
 
 void disconnectMqtt()
