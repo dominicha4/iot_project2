@@ -82,14 +82,140 @@ void disconnectMqtt()
 {
 }
 
-void publishMqtt(char strTopic[], char strData[])
+///for server side
+/*void publishMqtt(char strTopic[], char strData[])
 {
+    if(getTcpState(0) != TCP_ESTABLISHED) return; // check if there is an current tcp connection before making packet
+
+
+    uint8_t packet[200]; //holds the publish packet
+    uint16_t sizes = 0; //write index
+
+    //length of topic and payload of message
+    uint16_t topics = strlen(strTopic);
+    uint16_t datalength = strlen(strData);
+//publish packet, 0x0011 with flags
+    packet[sizes++] = 0x30;
+//handles the rest of the packet by storing it into 7 bits
+    int carrot = 2 + topics + datalength;
+    do
+    {
+        uint8_t york = carrot & 0x7F;
+        carrot >>= 7;
+        if(carrot) york |= 0x80;
+        packet[sizes++] = york;
+    } while (carrot);
+    //topic 2 bytes where msb is first then lsb
+    packet[sizes++] = topics >> 8;
+    packet[sizes++] = topics & 0xFF;
+//copy both the topics and payloads into packets
+    memcpy(&packet[sizes], strTopic, topics);
+    sizes += topics;
+
+    memcpy(&packet[sizes], strData, datalength);
+        sizes += datalength;
+        //builds frame buffer and sends the packet to tcp
+        uint8_t frame[MAX];
+        etherHeader *value = (etherHeader*) frame;
+        sendTcpMessage(value, getsocket(0), PSH | ACK, packet, sizes);
+    }
+
+
+
 }
 
 void subscribeMqtt(char strTopic[])
 {
+    if(getTcpState(0) != TCP_ESTABLISHED) return;
+
+    uint8_t packet[200];
+    uint16_t sizes = 0;
+
+    uint16_t topic = strlen(strTopic);
+    uint16_t ID = 1;
+
+    //header
+
+    packet[sizes++] = 0x82;
+
+    uint32_t re = 2+ 2 + topic + 1; // id of packet + plus the length og the topic + QoS(1)
+     do
+     {
+         uint8_t byte = re & 0x7F;
+         re >>= 7;
+         if (re > 0)
+             byte |= 0x80;
+         packet[sizes++] = byte;
+     } while (re > 0);
+
+     packet[sizes++] = ID >> 8;
+     packet[sizes++] = ID & 0xFF;
+
+     packet[sizes++] = topic >> 8;
+     packet[sizes++] = topic & 0xFF;
+
+     memcpy(&packet[sizes], strTopic, topic);
+
+     sizes += topic;
+
+     packet[sizes++] = 0x00; /// QoS = 0
+
+     //sends the packet
+
+     uint8_t frame[MAX];
+     etherHeader *value = (etherHeader*) frame;
+
+     sendTcpMessage(value, getsocket(0), PSH | ACK, packet, sizes);
+
+
+
+     }
 }
 
 void unsubscribeMqtt(char strTopic[])
 {
-}
+    if(getTcpState(0) != TCP_ESTABLISHED) return;
+
+        uint8_t packet[200];
+        uint16_t sizes = 0;
+
+        uint16_t topic = strlen(strTopic);
+        uint16_t ID = 1;
+
+        //header
+
+        packet[sizes++] = 0x82;
+
+        uint32_t re = 2+ 2 + topic + 1; // id of packet + plus the length og the topic + QoS(1)
+         do
+         {
+             uint8_t byte = re & 0x7F;
+             re >>= 7;
+             if (re > 0)
+                 byte |= 0x80;
+             packet[sizes++] = byte;
+         } while (re > 0);
+
+         packet[sizes++] = ID >> 8;
+         packet[sizes++] = ID & 0xFF;
+
+         packet[sizes++] = topic >> 8;
+         packet[sizes++] = topic & 0xFF;
+
+         memcpy(&packet[sizes], strTopic, topic);
+
+         sizes += topic;
+
+         packet[sizes++] = 0x00; /// QoS = 0
+
+         //sends the packet
+
+         uint8_t frame[MAX];
+         etherHeader *value = (etherHeader*) frame;
+
+         sendTcpMessage(value, getsocket(0), PSH | ACK, packet, sizes);
+
+
+
+}*/
+
