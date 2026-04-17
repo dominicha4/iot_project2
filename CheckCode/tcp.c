@@ -37,6 +37,8 @@ uint8_t tcpPortCount = 0;
 uint8_t tcpState[MAX_TCP_PORTS];
 //socket sockets[MAX_SOCKETS];
 
+bool mqttConnect = false;
+
 // ------------------------------------------------------------------------------
 //  Structures
 // ------------------------------------------------------------------------------
@@ -105,171 +107,306 @@ void sendTcpPendingMessages(etherHeader *ether)
 {
 }
 
+//void processTcpResponse(etherHeader *ether)
+//{
+//    socket *s = NULL; //make a socket pointer and start it as null in case no socket is found
+//    ipHeader *ip; //pointer that will point to UP header inside the Ethernet frame
+//    tcpHeader *tcp; //pointer that will point to the TCP header after the IP header
+//    uint8_t ipHeaderLength; //variable for the actual size of Ip header in bytes
+//    uint8_t i;                 //loop variable for searching through socket list
+//
+//    putsUart0("Entered processTcpResponse\r\n");
+//
+//    if (!isTcp(ether)) //check if packet is TCP packet
+//    {
+//        putsUart0("Not TCP\n");
+//        return;
+//    }
+//
+//    if (!isTcpPortOpen(ether)) //if TCP packet is not going to open port, then ignore it
+//    {
+//        putsUart0("TCP port not open\n");
+//        return;
+//    }
+//
+//    ip = (ipHeader*) ether->data; //points to IP header, which starts at the Ethernet data field
+//    ipHeaderLength = ip->size * 4; //IP header legnth is stored in 32 bit words, so multiply by 4 to get bytes
+//    tcp = (tcpHeader*) ((uint8_t*) ip + ipHeaderLength); //move past the IP header so tcp points to the tcp header
+//
+//    // Extracts source and destination TCP ports from incoming packets
+//    uint16_t srcPort = ntohs(tcp->sourcePort);
+//    uint16_t dstPort = ntohs(tcp->destPort);
+//    uint16_t offsetFields = ntohs(tcp->offsetFields);
+//
+//    //checks for the first step of TCP, client sends SYN and is trying to start a new connection
+//    if (isTcpSyn(ether) && !isTcpAck(ether))
+//    {
+//        putsUart0("TCP SYN received\r\n");
+//
+//        s = newSocket(); //use an unused socket so we can track new TCP connection
+//        if (s == NULL) //if no free socket available, leave becuase we have nowhere to store the new connection
+//        {
+//            putsUart0("No free socket\r\n");
+//            return;
+//        }
+//
+//        putsUart0("Socket allocated\r\n");
+//
+//        //function socket.c
+//        getSocketInfoFromTcpPacket(ether, s); //copy client IP, MAC, source port and destination port into socket
+//        putsUart0("Socket info copied\r\n");
+//
+//        s->sequenceNumber = 1; //choose a starting sequenct number for our side of TCP connection
+//        s->acknowledgementNumber = ntohl(tcp->sequenceNumber) + 1; //client sent us a SYN with its own sequence number
+//        s->state = TCP_SYN_RECEIVED; //we are now in SYN_RECEIVED state becasue we got SYN and will reply with SYN+ACK
+//        putsUart0("Sending SYN+ACK\r\n");
+//        sendTcpResponse(ether, s, SYN | ACK); // send SYN and ACK back to client as step 2 of handshake
+//
+//        s->sequenceNumber++;    //SYN consumes one sequence number
+//    }
+//    //this checks for the last step of TCP handshake, client sends ack after receiving our SYN+ACK
+//    else if(isTcpAck(ether) && !isTcpSyn(ether))
+//    {
+//        putsUart0("Final ACK received\r\n");
+//
+//        //looks through sockets for matching connection
+//        for (i = 0; i < MAX_SOCKETS; i++)
+//        {
+//            if (sockets[i].state == TCP_SYN_RECEIVED) //only chekcs sockets that are waiting for the final ACK
+//            {
+//                if ((sockets[i].localPort == ntohs(tcp->destPort))
+//                        && (sockets[i].remotePort == ntohs(tcp->sourcePort)))
+//                {
+//                    sockets[i].state = TCP_ESTABLISHED; //handshake is done, so mark this socket as connected
+//                    putsUart0("TCP connection established\r\n");
+//
+//                    if(mqttConnect)
+//                    {
+//                        mqttConnect = false;
+//                        connectMqtt(&sockets[i], ether);
+//                        putsUart0("Sending MQTT Connect\n\r");
+//                    }
+//
+//                    break;    //stop searching becuase we found the right socket
+//                }
+//            }
+//        }
+//    }
+//
+//    else if(isTcpAck(ether)) //general ack based traffic for SYN-ACK, FIN, etc
+//    {
+//        //Extracts TCP header length from upper 4 bits of offset field
+//        uint16_t rawOffsetFields = ntohs(tcp->offsetFields);
+//
+//        //The top 4 bits of offsetFields specify the number of 4-byte words
+//        uint8_t tcpHeaderLength = (rawOffsetFields >> 12) * 4;
+//        //Computes the payload size of IP length minus the headers
+//        uint16_t dataSize = ntohs(ip->length) - ipHeaderLength - tcpHeaderLength;
+//
+//        if(isTcpSyn(ether)) //SYN-ACK response handling
+//        {
+//            //Updates ACK number using server sequence number
+//            s->acknowledgementNumber += (ntohl(tcp->sequenceNumber) + 1);
+//            //sends ACK back to server
+//            sendTcpMessage(ether, s, ACK, NULL, 0);
+//        }
+//        else if((FIN & offsetFields) == FIN) //Terminating the Connection
+//        {
+//            uint8_t state = getTcpState(0);
+//
+//            if(state == TCP_ESTABLISHED) //Other device closes the connection
+//            {
+//                s->acknowledgementNumber += 1;
+//
+//                //Reply with FIN+ACK to close request
+//                sendTcpMessage(ether, s, FIN | ACK, NULL, 0);
+//
+//                s->sequenceNumber += 1;
+//                setTcpState(0, TCP_CLOSE_WAIT);
+//            }
+//
+//            else if(state == TCP_FIN_WAIT_1) //We finish the active closing sequence
+//            {
+//                s->acknowledgementNumber += 1;
+//                //Other device ACK
+//                sendTcpMessage(ether, s, ACK, NULL, 0);
+//
+//                //Send funal FIN
+//                sendTcpMessage(ether, s, FIN | ACK, NULL, 0);
+//
+//                setTcpState(0, TCP_CLOSED);
+//            }
+//            else if ((offsetFields & PSH) == PSH) //Processing MQTT
+//            {
+//                uint8_t *data = tcp->data;
+//                uint8_t buffer[100] = {0};
+//
+//                //Copy the payload into the buffer
+//                memcpy(buffer, data, dataSize);
+//
+//                //MQTT control packet type from upper 4 bits of the 1st byte
+//                uint8_t flag = buffer[0] >> 4;
+//
+//                if (flag == 2) // CONNACK RECEIVED
+//                {
+//                    // set the flag for MQTT_CONNECTED
+//                    setTcpState(1, MQTT_CONNECTED);
+//                    putsUart0("MQTT CONNECTED!!!\n\r");
+//                }
+//                else if (flag == 3) // PUBLISH
+//                {
+//                                    }
+//                else if (flag == 9) // SUBACK
+//                {
+//
+//                }
+//                else if (flag == 12) // PUBACK
+//                {
+//
+//                }
+//                else if (flag == 11) // UNSUBACK
+//                {
+//
+//                }
+//                //else return;
+//                s->acknowledgementNumber += dataSize; // update ack number
+//                sendTcpMessage(ether, s, ACK, NULL, 0);
+//            }
+//
+//        }
+//
+//        //Reset packets from connection error or abort
+//        else if ((offsetFields & RST) == RST)
+//        {
+//            setTcpState(0, TCP_CLOSED);
+//        }
+//    }
+//}
 void processTcpResponse(etherHeader *ether)
 {
-    socket *s = NULL; //make a socket pointer and start it as null in case no socket is found
-    ipHeader *ip; //pointer that will point to UP header inside the Ethernet frame
-    tcpHeader *tcp; //pointer that will point to the TCP header after the IP header
-    uint8_t ipHeaderLength; //variable for the actual size of Ip header in bytes
-    uint8_t i;                 //loop variable for searching through socket list
+    socket *s = NULL;
+    ipHeader *ip;
+    tcpHeader *tcp;
+    uint8_t ipHeaderLength;
+    uint8_t i;
 
     putsUart0("Entered processTcpResponse\r\n");
 
-    if (!isTcp(ether)) //check if packet is TCP packet
-    {
-        putsUart0("Not TCP\n");
+    if (!isTcp(ether))
         return;
-    }
 
-    if (!isTcpPortOpen(ether)) //if TCP packet is not going to open port, then ignore it
-    {
-        putsUart0("TCP port not open\n");
+    if (!isTcpPortOpen(ether))
         return;
-    }
 
-    ip = (ipHeader*) ether->data; //points to IP header, which starts at the Ethernet data field
-    ipHeaderLength = ip->size * 4; //IP header legnth is stored in 32 bit words, so multiply by 4 to get bytes
-    tcp = (tcpHeader*) ((uint8_t*) ip + ipHeaderLength); //move past the IP header so tcp points to the tcp header
+    ip = (ipHeader*) ether->data;
+    ipHeaderLength = ip->size * 4;
+    tcp = (tcpHeader*) ((uint8_t*) ip + ipHeaderLength);
 
-    // Extracts source and destination TCP ports from incoming packets
     uint16_t srcPort = ntohs(tcp->sourcePort);
     uint16_t dstPort = ntohs(tcp->destPort);
-    uint16_t offsetFields = ntohs(tcp->offsetFields);
 
-    //checks for the first step of TCP, client sends SYN and is trying to start a new connection
-    if (isTcpSyn(ether) && !isTcpAck(ether))
+    bool syn = isTcpSyn(ether);
+    bool ack = isTcpAck(ether);
+
+    // -------------------------
+    // 1. SYN received
+    // -------------------------
+    if (syn && !ack)
     {
         putsUart0("TCP SYN received\r\n");
 
-        s = newSocket(); //use an unused socket so we can track new TCP connection
-        if (s == NULL) //if no free socket available, leave becuase we have nowhere to store the new connection
+        s = newSocket();
+        if (s == NULL)
         {
             putsUart0("No free socket\r\n");
             return;
         }
 
-        putsUart0("Socket allocated\r\n");
+        getSocketInfoFromTcpPacket(ether, s);
 
-        //function socket.c
-        getSocketInfoFromTcpPacket(ether, s); //copy client IP, MAC, source port and destination port into socket
-        putsUart0("Socket info copied\r\n");
+        s->sequenceNumber = 1;
+        s->acknowledgementNumber = ntohl(tcp->sequenceNumber) + 1;
+        s->state = TCP_SYN_RECEIVED;
 
-        s->sequenceNumber = 1; //choose a starting sequenct number for our side of TCP connection
-        s->acknowledgementNumber = ntohl(tcp->sequenceNumber) + 1; //client sent us a SYN with its own sequence number
-        s->state = TCP_SYN_RECEIVED; //we are now in SYN_RECEIVED state becasue we got SYN and will reply with SYN+ACK
-        putsUart0("Sending SYN+ACK\r\n");
-        sendTcpResponse(ether, s, SYN | ACK); // send SYN and ACK back to client as step 2 of handshake
+        sendTcpResponse(ether, s, SYN | ACK);
+        s->sequenceNumber++;
 
-        s->sequenceNumber++;    //SYN consumes one sequence number
+        return;
     }
-    //this checks for the last step of TCP handshake, client sends ack after receiving our SYN+ACK
-    else if(isTcpAck(ether) && !isTcpSyn(ether))
-    {
-        putsUart0("Final ACK received\r\n");
 
-        //looks through sockets for matching connection
+    // -------------------------
+    // 2. Final ACK (handshake complete)
+    // -------------------------
+    if (ack && !syn)
+    {
         for (i = 0; i < MAX_SOCKETS; i++)
         {
-            if (sockets[i].state == TCP_SYN_RECEIVED) //only chekcs sockets that are waiting for the final ACK
+            if (sockets[i].state == TCP_SYN_RECEIVED &&
+                sockets[i].localPort == dstPort &&
+                sockets[i].remotePort == srcPort)
             {
-                if ((sockets[i].localPort == ntohs(tcp->destPort))
-                        && (sockets[i].remotePort == ntohs(tcp->sourcePort)))
+                sockets[i].state = TCP_ESTABLISHED;
+
+                putsUart0("TCP connection established\r\n");
+
+                // IMPORTANT: use THIS socket
+                s = &sockets[i];
+
+                if (mqttConnect)
                 {
-                    sockets[i].state = TCP_ESTABLISHED; //handshake is done, so mark this socket as connected
-                    putsUart0("TCP connection established\r\n");
-                    break;    //stop searching becuase we found the right socket
+                    mqttConnect = false;
+                    connectMqtt(s, ether);
                 }
+
+                return;
             }
         }
     }
 
-    else if(isTcpAck(ether)) //general ack based traffic for SYN-ACK, FIN, etc
+    // -------------------------
+    // 3. DATA / MQTT / ACK handling
+    // -------------------------
+    if (ack)
     {
-        //Extracts TCP header length from upper 4 bits of offset field
-        uint16_t rawOffsetFields = ntohs(tcp->offsetFields);
+        uint16_t raw = ntohs(tcp->offsetFields);
+        uint8_t tcpHeaderLength = (raw >> 12) * 4;
 
-        //The top 4 bits of offsetFields specify the number of 4-byte words
-        uint8_t tcpHeaderLength = (rawOffsetFields >> 12) * 4;
-        //Computes the payload size of IP length minus the headers
         uint16_t dataSize = ntohs(ip->length) - ipHeaderLength - tcpHeaderLength;
 
-        if(isTcpSyn(ether)) //SYN-ACK response handling
+        // find socket again
+        for (i = 0; i < MAX_SOCKETS; i++)
         {
-            //Updates ACK number using server sequence number
-            s->acknowledgementNumber += (ntohl(tcp->sequenceNumber) + 1);
-            //sends ACK back to server
-            sendTcpMessage(ether, s, ACK, NULL, 0);
-        }
-        else if((FIN & offsetFields) == FIN) //Terminating the Connection
-        {
-            uint8_t state = getTcpState(0);
-
-            if(state == TCP_ESTABLISHED) //Other device closes the connection
+            if (sockets[i].state == TCP_ESTABLISHED &&
+                sockets[i].localPort == dstPort &&
+                sockets[i].remotePort == srcPort)
             {
-                s->acknowledgementNumber += 1;
-
-                //Reply with FIN+ACK to close request
-                sendTcpMessage(ether, s, FIN | ACK, NULL, 0);
-
-                s->sequenceNumber += 1;
-                setTcpState(0, TCP_CLOSE_WAIT);
+                s = &sockets[i];
+                break;
             }
-
-            else if(state == TCP_FIN_WAIT_1) //We finish the active closing sequence
-            {
-                s->acknowledgementNumber += 1;
-                //Other device ACK
-                sendTcpMessage(ether, s, ACK, NULL, 0);
-
-                //Send funal FIN
-                sendTcpMessage(ether, s, FIN | ACK, NULL, 0);
-
-                setTcpState(0, TCP_CLOSED);
-            }
-            else if ((offsetFields & PSH) == PSH) //Processing MQTT
-            {
-                uint8_t *data = tcp->data;
-                uint8_t buffer[100] = {0};
-
-                //Copy the payload into the buffer
-                memcpy(buffer, data, dataSize);
-
-                //MQTT control packet type from upper 4 bits of the 1st byte
-                uint8_t flag = buffer[0] >> 4;
-
-                if (flag == 2) // CONNACK RECEIVED
-                {
-                    // set the flag for MQTT_CONNECTED
-                    setTcpState(1, MQTT_CONNECTED);
-                    putsUart0("MQTT CONNECTED!!!\n\r");
-                }
-                else if (flag == 3) // PUBLISH
-                {
-                                    }
-                else if (flag == 9) // SUBACK
-                {
-
-                }
-                else if (flag == 12) // PUBACK
-                {
-
-                }
-                else if (flag == 11) // UNSUBACK
-                {
-
-                }
-                //else return;
-                s->acknowledgementNumber += dataSize; // update ack number
-                sendTcpMessage(ether, s, ACK, NULL, 0);
-            }
-
         }
 
-        //Reset packets from connection error or abort
-        else if ((offsetFields & RST) == RST)
+        if (s == NULL)
+            return;
+
+        // ---------------- MQTT parsing ----------------
+        if (dataSize > 0)
         {
-            setTcpState(0, TCP_CLOSED);
+            uint8_t *data = tcp->data;
+
+            uint8_t packetType = data[0] >> 4;
+
+            if (packetType == 2)
+            {
+                putsUart0("MQTT CONNACK received\r\n");
+            }
+            else if (packetType == 3)
+            {
+                putsUart0("MQTT PUBLISH received\r\n");
+            }
         }
+
+        s->acknowledgementNumber += dataSize;
+        sendTcpMessage(ether, s, ACK, NULL, 0);
     }
 }
 

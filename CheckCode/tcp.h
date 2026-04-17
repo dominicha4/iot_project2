@@ -24,6 +24,8 @@
 #include "ip.h"
 #include "socket.h"
 
+extern bool mqttConnect;
+
 typedef struct _tcpHeader // 20 or more bytes
 {
     uint16_t sourcePort;
