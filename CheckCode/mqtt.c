@@ -180,9 +180,9 @@ void unsubscribeMqtt(char strTopic[])
 
         //header
 
-        packet[sizes++] = 0x82;
+        packet[sizes++] = 0xA2; // Q0S1 unsubscribe
 
-        uint32_t re = 2+ 2 + topic + 1; // id of packet + plus the length og the topic + QoS(1)
+        uint32_t re = 2+ 2 + topic; // id of packet + plus the length og the topic + QoS(1)
          do
          {
              uint8_t byte = re & 0x7F;
@@ -202,7 +202,7 @@ void unsubscribeMqtt(char strTopic[])
 
          sizes += topic;
 
-         packet[sizes++] = 0x00; /// QoS = 0
+         //packet[sizes++] = 0x00; /// QoS = 0
 
          //sends the packet
 
@@ -213,5 +213,6 @@ void unsubscribeMqtt(char strTopic[])
 
 
 
-}*/
+}
+*/
 
