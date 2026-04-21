@@ -38,7 +38,7 @@ static uint8_t count = 0;
 //-----------------------------------------------------------------------------
 // Subroutines
 //-----------------------------------------------------------------------------
-void Qtopic(char*topic)
+void Qtopic(char *topic)
 {
     if(count >= Topics) return;
     strncpy(topicQueue[count++], topic, Tlength - 1);
