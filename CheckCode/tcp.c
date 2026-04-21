@@ -397,7 +397,8 @@ void processTcpResponse(etherHeader *ether)
 
             if (packetType == 2)
             {
-                putsUart0("MQTT CONNACK received\r\n");
+               // putsUart0("MQTT CONNACK received\r\n");
+                connACKMqtt(s, ether, data);
             }
             else if (packetType == 3)
             {
