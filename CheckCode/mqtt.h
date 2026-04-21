@@ -26,8 +26,9 @@
 //-----------------------------------------------------------------------------
 // Subroutines
 //-----------------------------------------------------------------------------
-
+void Qtopic(char *topic);
 void connectMqtt(socket *s, etherHeader *ether);
+void connACKMqtt(socket *s, etherHeader *ether, uint8_t *data);
 void disconnectMqtt();
 void publishMqtt(char strTopic[], char strData[]);
 void subscribeMqtt(char strTopic[]);
