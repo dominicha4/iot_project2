@@ -354,7 +354,12 @@ void processShell()
                 {
                     topic = strtok(NULL, " ");
                     if (topic != NULL)
-                        subscribeMqtt(topic);
+                    {
+                        if(getTcpState(1) == MQTT_CONNECTED) subscribeMqtt(topic);
+                        else Qtopic(topic);
+                        
+                        //subscribeMqtt(topic);
+                    }
                 }
                 if (strcmp(token, "unsubscribe") == 0)
                 {
