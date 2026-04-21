@@ -26,14 +26,33 @@
 // ------------------------------------------------------------------------------
 //  Globals
 // ------------------------------------------------------------------------------
+#define MAX 1518
+#define Topics 10
+#define Tlength 64
 
 // ------------------------------------------------------------------------------
 //  Structures
 // ------------------------------------------------------------------------------
-
+static char topicQueue[Topics][Tlength];
+static uint8_t count = 0;
 //-----------------------------------------------------------------------------
 // Subroutines
 //-----------------------------------------------------------------------------
+void Qtopic(char*topic)
+{
+    if(count >= Topics) return;
+    strncpy(topicQueue[count++], topic, Tlength - 1);
+}
+uint8_t getTopicCount()
+{
+  return count;
+}
+
+char *getTopic(uint8_t index)
+{
+    if(index >= count) return NULL;
+    return topicQueue[index];
+}
 
 void connectMqtt(socket *s, etherHeader *ether)
 {
@@ -77,6 +96,24 @@ void connectMqtt(socket *s, etherHeader *ether)
 void disconnectMqtt()
 {
 }
+
+connACKMqtt(uint8_t *data) //check processtcpresponse
+{
+    uint8_t session = data[2] & 0x01; //data1 and 0 is already confirmed
+    uint8_t returnCode = data[3];
+    if(returnCode != 0)
+    {
+        putsUart0("MQTT CONNACK: Refused\r\n");
+        return;
+    }
+    putsUart0("MQTT CONNACK: Accepted\r\n");
+    setTcpState(1, MQTT_CONNECTED);
+
+    uint8_t i;
+    for (i = 0; i< getTopicCount(); i++)
+    {
+        subscribeMqtt(getTopic(i));
+    }
 /*
 ////for server side
 void publishMqtt(char strTopic[], char strData[])
