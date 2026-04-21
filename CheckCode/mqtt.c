@@ -97,7 +97,7 @@ void disconnectMqtt()
 {
 }
 
-connACKMqtt(socket *s, etherHeader *ether, uint8_t *data)  //check processtcpresponse
+void connACKMqtt(socket *s, etherHeader *ether, uint8_t *data)  //check processtcpresponse
 {
     uint8_t session = data[2] & 0x01; //data1 and 0 is already confirmed
     uint8_t returnCode = data[3];
