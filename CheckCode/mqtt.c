@@ -22,22 +22,25 @@
 #include "timer.h"
 #include "tcp.h"
 #include "uart0.h"
-
-// ------------------------------------------------------------------------------
-//  Globals
-// ------------------------------------------------------------------------------
 #define MAX 1518
 #define Topics 10
 #define Tlength 64
 
+static char topicQueue[Topics][Tlength];
+static uint8_t count = 0;
+// ------------------------------------------------------------------------------
+//  Globals
+// ------------------------------------------------------------------------------
+
 // ------------------------------------------------------------------------------
 //  Structures
 // ------------------------------------------------------------------------------
-static char topicQueue[Topics][Tlength];
-static uint8_t count = 0;
+
 //-----------------------------------------------------------------------------
 // Subroutines
 //-----------------------------------------------------------------------------
+
+
 void Qtopic(char *topic)
 {
     if(count >= Topics) return;
@@ -93,11 +96,12 @@ void connectMqtt(socket *s, etherHeader *ether)
     sendTcpMessage(ether, s, PSH | ACK, mqttData, mqttDataSize);
 }
 
+
 void disconnectMqtt()
 {
 }
 
-void connACKMqtt(socket *s, etherHeader *ether, uint8_t *data)  //check processtcpresponse
+void connACKMqtt(socket *s, etherHeader *ether, uint8_t *data) //check processtcpresponse
 {
     uint8_t session = data[2] & 0x01; //data1 and 0 is already confirmed
     uint8_t returnCode = data[3];
@@ -105,6 +109,14 @@ void connACKMqtt(socket *s, etherHeader *ether, uint8_t *data)  //check processt
     {
         putsUart0("MQTT CONNACK: Refused\r\n");
         return;
+    }
+    if (session)
+    {
+    putsUart0("MQTT CONNACK accepted a previous session\r\n");
+    }
+    else
+    {
+        putsUart0("MQTT CONNACK accepted, clean session\r\n");
     }
     putsUart0("MQTT CONNACK: Accepted\r\n");
     setTcpState(1, MQTT_CONNECTED);
@@ -115,6 +127,28 @@ void connACKMqtt(socket *s, etherHeader *ether, uint8_t *data)  //check processt
         subscribeMqtt(getTopic(i));
     }
 /*
+    switch (returnCode)
+    {
+    case 0:
+        putsUart0("MQTT CONNACK: Accepted\r\n");
+        setTcpState(1, MQTT_CONNECTED);
+        break;
+    case 1:
+        putsUart0("MQTT CONNACK: Refused ,  bad version\r\n");
+        break;
+    case 2:
+           putsUart0("MQTT CONNACK: Refused ,  bad version\r\n");
+           break;
+    case 3:
+           putsUart0("MQTT CONNACK: Refused ,  server is unavailable\r\n");
+           break;
+    case 4:
+           putsUart0("MQTT CONNACK: Refused ,  not valid password\r\n");
+           break;*/
+
+
+
+}
 ////for server side
 void publishMqtt(char strTopic[], char strData[])
 {
@@ -155,7 +189,7 @@ void publishMqtt(char strTopic[], char strData[])
 
 
 
-}
+
 
 void subscribeMqtt(char strTopic[])
 {
@@ -203,7 +237,7 @@ void subscribeMqtt(char strTopic[])
 
 
      }
-}
+
 
 void unsubscribeMqtt(char strTopic[])
 {
@@ -251,5 +285,5 @@ void unsubscribeMqtt(char strTopic[])
 
 
 }
-*/
+
 
