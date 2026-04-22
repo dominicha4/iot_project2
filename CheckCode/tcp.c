@@ -80,22 +80,24 @@ bool isTcp(etherHeader *ether)
 }
 
 ///board inintiates the connection to the broker
-void TcpConnection(socket *s)
+void TcpConnection(socket *s) 
 {
+    //fresh buffer and ensures clean packet
     uint8_t Buff[MAX_PACKET_SIZE]; 
     memset(Buff, 0, MAX_PACKET_SIZE);
     etherHeader *ether = (etherHeader*) Buff;
 
-    
+    //get broker IP ADDRESS
     uint8_t BIp[4];
     getIpMqttBrokerAddress(BIp);
-    memcpy(s->remoteIpAddress, BIp, 4);
-    s->remotePort = 1883;//broker
+    memcpy(s->remoteIpAddress, BIp, 4);//store broker as a remote destination
+    s->remotePort = 1883;//broker port
     s->localPort = 49152; //our port
-    s->sequenceNumber = 1;
-    s->acknowledgementNumber = 0;
-    s->state = TCP_SYN_SENT;
-    sendTcpMessage(ether, s, SYN, NULL, 0);
+    s->sequenceNumber = 1; //start sequence number
+    s->acknowledgementNumber = 0;//nothing is recieved
+    s->state = TCP_SYN_SENT; //checks to see for SYN and ACK
+    sendTcpMessage(ether, s, SYN, NULL, 0);// sends message to broker
+    putsUart0("TCP SYN was sent to broker\r\n");
 }
 
 
@@ -161,7 +163,7 @@ void processTcpResponse(etherHeader *ether)
         // 1. Final ACK handles FIN
         //
     // -------------------------
-
+//checks if broker is closing, sends a FIN FLAG if it does occure
     uint16_t flags = ntohs(tcp->offsetFields) & 0x01FF;
     if (flags & FIN)
     {
@@ -173,10 +175,11 @@ void processTcpResponse(etherHeader *ether)
         setTcpState(1, MQTT_UNCONNECTED);
         putsUart0("TCP connection closed\r\n");
     }
-    // 2. Final ACK (handshake complete)
+    // 2. waits for SYN+ACK
     // -------------------------
     if (syn && ack)
     {
+        
         for (i = 0; i < MAX_SOCKETS; i++)
         {
             if (sockets[i].state == TCP_SYN_SENT &&
@@ -185,7 +188,7 @@ void processTcpResponse(etherHeader *ether)
             {
                 // IMPORTANT: use THIS socket
                 s = &sockets[i];
-                s->acknowledgementNumber = ntohl(tcp->sequenceNumber) + 1;
+                s->acknowledgementNumber = ntohl(tcp->sequenceNumber) + 1; //brokers sequence
 
                 sockets[i].state = TCP_ESTABLISHED;
 
@@ -281,13 +284,14 @@ bool isTcpPortOpen(etherHeader *ether)
     uint8_t ipHeaderLength = ip->size * 4;
     tcpHeader *tcp = (tcpHeader*) ((uint8_t*) ip + ipHeaderLength);
 
-    // destination port tells us which local port the packet is trying to reach//
+    // client checks source port and sends traffic from the broker to check where its from//
     //changed
     uint16_t srcPort = ntohs(tcp->sourcePort);
 
     uint8_t i;
     for (i = 0; i < tcpPortCount; i++)
     {
+        //proccesses the packet from out port
         if (tcpPorts[i] == srcPort)
             return true;
     }
@@ -318,12 +322,12 @@ void sendTcpMessage(etherHeader *ether, socket *s, uint16_t flags,
 
     putsUart0("Entered sendTcpMessage\r\n");
 
-    //swap destination and source MAC addresses so packet goes back to sender
+    //get the mac from the board and driver
     uint8_t tempMac[6];
     getEtherMacAddress(tempMac);
-    //memcpy(tempMac, ether->destAddress, 6);
+    //memcpy(tempMac, ether->destAddress, 6);//broker is the destination which is stored in tcpconnection
     memcpy(ether->destAddress, s->remoteHwAddress, 6);
-    memcpy(ether->sourceAddress, tempMac, 6);
+    memcpy(ether->sourceAddress, tempMac, 6);//source is our mac address
     putsUart0("MAC addresses swapped\r\n");
 
     // Fill IP Header
@@ -336,7 +340,7 @@ void sendTcpMessage(etherHeader *ether, socket *s, uint16_t flags,
     ip->protocol = PROTOCOL_TCP;       // TCP protocol
     ip->headerChecksum = 0;            // Checksum (calculated later)
 
-    //swap source and destination IP addresses so reply goes back to the other device
+    //like the logic from above
     uint8_t tempIp[4];
    // memcpy(tempIp, ip->sourceIp, 4);
     getIpAddress(tempIp);
