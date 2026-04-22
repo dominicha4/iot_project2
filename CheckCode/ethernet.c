@@ -615,13 +615,13 @@ int main(void)
                             putsUart0("Calling processTcpResponse\r\n");
                             processTcpResponse(data);
                         }
-                        else
-                        {
-                            putsUart0("TCP port is closed\r\n");
+                        //else
+                        //{
+                        //    putsUart0("TCP port is closed\r\n");
 
                             // for closed ports, send reset response
-                            sendTcpResponse(data, &s, ACK | RST);
-                        }
+                        //    sendTcpResponse(data, &s, ACK | RST);
+                        //}
                     }
 
                     if (isUdp(data))
