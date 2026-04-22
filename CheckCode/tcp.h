@@ -26,6 +26,8 @@
 
 extern bool mqttConnect;
 
+#define MAX_PACKET_SIZE 1518
+
 typedef struct _tcpHeader // 20 or more bytes
 {
     uint16_t sourcePort;
