@@ -80,6 +80,7 @@ bool isTcp(etherHeader *ether);
 bool isTcpSyn(etherHeader *ether);
 bool isTcpAck(etherHeader *ether);
 
+socket* tcpConnect(uint8_t ip[], uint16_t port);
 void sendTcpPendingMessages(etherHeader *ether);
 void processTcpResponse(etherHeader *ether);
 void processTcpArpResponse(etherHeader *ether);
