@@ -337,8 +337,8 @@ void processShell()
                 if (strcmp(token, "connect") == 0)
                 {
                     mqttConnect = true;
-                    socket *s = getsocket(0);
-                    TcpConnection(s);
+                    socket *s = getsocket(0);//get socket 0 from the broker connection
+                    TcpConnection(s);//send tcp syn to broker to start handshake, puts it in its own buffer.
                     putsUart0("CONNECTING TO MQTT once TCP has been ESTABLISHED\r\n");
                 }
                 if (strcmp(token, "disconnect") == 0)
