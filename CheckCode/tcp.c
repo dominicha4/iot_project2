@@ -80,8 +80,13 @@ bool isTcp(etherHeader *ether)
 }
 
 ///board inintiates the connection to the broker
-void TcpConnection(etherHeader *ether, socket *s)
+void TcpConnection(socket *s)
 {
+    uint8_t Buff[MAX_PACKET_SIZE]; 
+    memset(Buff, 0, MAX_PACKET_SIZE);
+    etherHeader *ether = (etherHeader*) Buff;
+
+    
     uint8_t BIp[4];
     getIpMqttBrokerAddress(BIp);
     memcpy(s->remoteIpAddress, BIp, 4);
