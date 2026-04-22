@@ -337,6 +337,8 @@ void processShell()
                 if (strcmp(token, "connect") == 0)
                 {
                     mqttConnect = true;
+                    socket *s = getsocket(0);
+                    TcpConnection(s);
                     putsUart0("CONNECTING TO MQTT once TCP has been ESTABLISHED\r\n");
                 }
                 if (strcmp(token, "disconnect") == 0)
