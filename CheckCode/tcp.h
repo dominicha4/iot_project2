@@ -85,6 +85,7 @@ void sendTcpPendingMessages(etherHeader *ether);
 void processTcpResponse(etherHeader *ether);
 void processTcpArpResponse(etherHeader *ether);
 
+void TcpConnection(socket *s);
 void setTcpPortList(uint16_t ports[], uint8_t count);
 bool isTcpPortOpen(etherHeader *ether);
 void sendTcpResponse(etherHeader *ether, socket *s, uint16_t flags);
