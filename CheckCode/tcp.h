@@ -24,10 +24,6 @@
 #include "ip.h"
 #include "socket.h"
 
-extern bool mqttConnect;
-
-#define MAX_PACKET_SIZE 1518
-
 typedef struct _tcpHeader // 20 or more bytes
 {
     uint16_t sourcePort;
@@ -66,15 +62,10 @@ typedef struct _tcpHeader // 20 or more bytes
 #define NS  0x0100
 #define OFS_SHIFT 12
 
-// MQTT states
-#define MQTT_UNCONNECTED 0
-#define MQTT_CONNECTED 1
-#define MQTT_SUBSCRIBED 2
-
 //-----------------------------------------------------------------------------
 // Subroutines
 //-----------------------------------------------------------------------------
-socket *getsocket(uint8_t instance);
+
 void setTcpState(uint8_t instance, uint8_t state);
 uint8_t getTcpState(uint8_t instance);
 
@@ -82,12 +73,10 @@ bool isTcp(etherHeader *ether);
 bool isTcpSyn(etherHeader *ether);
 bool isTcpAck(etherHeader *ether);
 
-socket* tcpConnect(uint8_t ip[], uint16_t port);
 void sendTcpPendingMessages(etherHeader *ether);
 void processTcpResponse(etherHeader *ether);
 void processTcpArpResponse(etherHeader *ether);
 
-void TcpConnection(socket *s);
 void setTcpPortList(uint16_t ports[], uint8_t count);
 bool isTcpPortOpen(etherHeader *ether);
 void sendTcpResponse(etherHeader *ether, socket *s, uint16_t flags);

@@ -282,7 +282,12 @@ void processTcpResponse(etherHeader *ether)
             s->state = TCP_ESTABLISHED;
 
             putsUart0("TCP connection established (client)\r\n");
-        }
+
+           if (mqttState == MQTT_WAIT_TCP)
+           {
+               mqttState = MQTT_TCP_READY;
+           }
+}
     }
 
     /***** SERVER SIDE that checks for the first step of TCP, client sends SYN and is trying to start a new connection *****/
@@ -551,3 +556,4 @@ socket* tcpConnect(uint8_t ip[], uint16_t port)
 
     return s;
 }
+

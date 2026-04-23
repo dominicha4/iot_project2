@@ -339,16 +339,13 @@ void processShell()
                     uint8_t ip[4];
                     getIpMqttBrokerAddress(ip);
 
-                    // Uses board as client and sets the broker(mosquitto) as server
-                    // Starts TCP connection and delays until established. Connects to Mqtt once established in main
-                    mqttSocket = tcpConnect(ip, 1883);
+                    putsUart0("Starting MQTT connect...\r\n");
 
-                    if (mqttSocket != NULL)
-                    {
-                        mqttConnected = false;      //
-                        mqttConnectSent = false;
-                        putsUart0("TCP connect started, waiting for handshake...\r\n");
-                    }
+                    mqttState = MQTT_WAIT_TCP;
+                    mqttConnectSent = false;
+                    mqttConnected = false;
+
+                    mqttSocket = tcpConnect(ip, 1883);  // ONLY starts TCP handshake
                 }
                 if (strcmp(token, "disconnect") == 0)
                 {
@@ -554,12 +551,19 @@ int main(void)
 
 
         // Checks if TCP is Established and MQTT has not been sent
-        if (mqttSocket != NULL && mqttSocket->state == TCP_ESTABLISHED &&
-            !mqttConnectSent)
+        if (mqttSocket != NULL && mqttSocket->state == TCP_ESTABLISHED
+            && mqttState == MQTT_TCP_READY && !mqttConnectSent)
         {
             putsUart0("Sending MQTT CONNECT...\r\n");
             connectMqtt(mqttSocket);
-            mqttConnectSent = true;   // Set to true to not send another
+
+            mqttConnectSent = true;
+            mqttState = MQTT_CONNECTING;
+        }
+
+        if (mqttState == MQTT_CONNECTED)
+        {
+            // You can now subscribe/publish safely
         }
 
 
