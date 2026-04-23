@@ -40,6 +40,13 @@ bool reload[NUM_TIMERS];
 void initTimer()
 {
     uint8_t i;
+    for (i = 0; i < NUM_TIMERS; i++)
+    {
+        period[i] = 0;
+        ticks[i] = 0;
+        fn[i] = NULL;
+        reload[i] = false;
+    }
 
     // Enable clocks
     SYSCTL_RCGCTIMER_R |= SYSCTL_RCGCTIMER_R4;
@@ -53,13 +60,7 @@ void initTimer()
     TIMER4_IMR_R |= TIMER_IMR_TATOIM;                // turn-on interrupt
     NVIC_EN2_R |= 1 << (INT_TIMER4A-80);             // turn-on interrupt 86 (TIMER4A)
 
-    for (i = 0; i < NUM_TIMERS; i++)
-    {
-        period[i] = 0;
-        ticks[i] = 0;
-        fn[i] = NULL;
-        reload[i] = false;
-    }
+
 }
 
 bool startOneshotTimer(_callback callback, uint32_t seconds)
@@ -140,7 +141,9 @@ void tickIsr()
             {
                 if (reload[i])
                     ticks[i] = period[i];
-                (*fn[i])();
+
+                if (fn[i] != NULL)
+                    (*fn[i])();
             }
         }
     }

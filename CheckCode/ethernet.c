@@ -336,10 +336,19 @@ void processShell()
                 token = strtok(NULL, " ");
                 if (strcmp(token, "connect") == 0)
                 {
-                    mqttConnect = true;
-                    socket *s = getsocket(0);//get socket 0 from the broker connection
-                    TcpConnection(s);//send tcp syn to broker to start handshake, puts it in its own buffer.
-                    putsUart0("CONNECTING TO MQTT once TCP has been ESTABLISHED\r\n");
+                    uint8_t ip[4];
+                    getIpMqttBrokerAddress(ip);
+
+                    // Uses board as client and sets the broker(mosquitto) as server
+                    // Starts TCP connection and delays until established. Connects to Mqtt once established in main
+                    mqttSocket = tcpConnect(ip, 1883);
+
+                    if (mqttSocket != NULL)
+                    {
+                        mqttConnected = false;      //
+                        mqttConnectSent = false;
+                        putsUart0("TCP connect started, waiting for handshake...\r\n");
+                    }
                 }
                 if (strcmp(token, "disconnect") == 0)
                 {
@@ -356,12 +365,7 @@ void processShell()
                 {
                     topic = strtok(NULL, " ");
                     if (topic != NULL)
-                    {
-                        if(getTcpState(1) == MQTT_CONNECTED) subscribeMqtt(topic);
-                        else Qtopic(topic);
-                        
-                        //subscribeMqtt(topic);
-                    }
+                        subscribeMqtt(topic);
                 }
                 if (strcmp(token, "unsubscribe") == 0)
                 {
@@ -548,6 +552,17 @@ int main(void)
         // TCP maintenance (empty for now, but we leave the call here)
         sendTcpPendingMessages(data);
 
+
+        // Checks if TCP is Established and MQTT has not been sent
+        if (mqttSocket != NULL && mqttSocket->state == TCP_ESTABLISHED &&
+            !mqttConnectSent)
+        {
+            putsUart0("Sending MQTT CONNECT...\r\n");
+            connectMqtt(mqttSocket);
+            mqttConnectSent = true;   // Set to true to not send another
+        }
+
+
         // only process packets if something arrived
         if (isEtherDataAvailable())
         {
@@ -615,13 +630,13 @@ int main(void)
                             putsUart0("Calling processTcpResponse\r\n");
                             processTcpResponse(data);
                         }
-                        //else
-                        //{
-                        //    putsUart0("TCP port is closed\r\n");
+                        else
+                        {
+                            putsUart0("TCP port is closed\r\n");
 
                             // for closed ports, send reset response
-                        //    sendTcpResponse(data, &s, ACK | RST);
-                        //}
+                            sendTcpResponse(data, &s, ACK | RST);
+                        }
                     }
 
                     if (isUdp(data))
