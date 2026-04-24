@@ -22,6 +22,8 @@ tcp.obj: ../ip.h
 tcp.obj: ../tcp.h
 tcp.obj: ../socket.h
 tcp.obj: ../timer.h
+tcp.obj: ../uart0.h
+tcp.obj: ../mqtt.h
 tcp.obj: C:/ti/ccs1281/ccs/tools/compiler/ti-cgt-arm_20.2.7.LTS/include/stdlib.h
 
 ../tcp.c:
@@ -67,6 +69,10 @@ C:/ti/ccs1281/ccs/tools/compiler/ti-cgt-arm_20.2.7.LTS/include/stdbool.h:
 ../socket.h:
 
 ../timer.h:
+
+../uart0.h:
+
+../mqtt.h:
 
 C:/ti/ccs1281/ccs/tools/compiler/ti-cgt-arm_20.2.7.LTS/include/stdlib.h:
 

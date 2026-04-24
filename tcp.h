@@ -83,5 +83,6 @@ void sendTcpResponse(etherHeader *ether, socket *s, uint16_t flags);
 void sendTcpMessage(etherHeader *ether, socket *s, uint16_t flags,
                     uint8_t data[], uint16_t dataSize);
 
-#endif
+void tcpConnect(etherHeader *ether, uint16_t port);
 
+#endif

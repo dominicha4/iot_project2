@@ -336,7 +336,12 @@ void processShell()
                 token = strtok(NULL, " ");
                 if (strcmp(token, "connect") == 0)
                 {
-                    connectMqtt();
+                    putsUart0("Starting MQTT connect...\r\n");
+
+                    mqttState = MQTT_WAIT_TCP;
+                    mqttConnectSent = false;
+                    mqttConnected = false;
+
                 }
                 if (strcmp(token, "disconnect") == 0)
                 {
@@ -526,6 +531,7 @@ int main(void)
     setPinValue(GREEN_LED, 0);
     waitMicrosecond(100000);
 
+    tcpConnect(data, 1883);
     while (true)
     {
         // UART shell commands
@@ -539,6 +545,24 @@ int main(void)
 
         // TCP maintenance (empty for now, but we leave the call here)
         sendTcpPendingMessages(data);
+
+
+        // Checks if TCP is Established and MQTT has not been sent
+        if (mqttSocket != NULL && mqttSocket->state == TCP_ESTABLISHED
+            && mqttState == MQTT_WAIT_TCP && !mqttConnectSent)
+        {
+            putsUart0("Sending MQTT CONNECT...\r\n");
+            connectMqtt(mqttSocket);
+
+            mqttConnectSent = true;
+            mqttState = MQTT_CONNECTING;
+        }
+
+        if (mqttState == MQTT_CONNECTED)
+        {
+            // You can now subscribe/publish safely
+        }
+
 
         // only process packets if something arrived
         if (isEtherDataAvailable())
@@ -592,13 +616,13 @@ int main(void)
                     {
                         putsUart0("TCP packet seen\r\n");
 
-                        // print if SYN flag is set
-                        if (isTcpSyn(data))
-                            putsUart0("SYN seen\r\n");
-
-                        // print if ACK flag is set
-                        if (isTcpAck(data))
-                            putsUart0("ACK seen\r\n");
+//                        // print if SYN flag is set
+//                        if (isTcpSyn(data))
+//                            putsUart0("SYN seen\r\n");
+//
+//                        // print if ACK flag is set
+//                        if (isTcpAck(data))
+//                            putsUart0("ACK seen\r\n");
 
                         // check whether the packet is trying to reach one of our open TCP ports
                         if (isTcpPortOpen(data))
@@ -607,12 +631,11 @@ int main(void)
                             putsUart0("Calling processTcpResponse\r\n");
                             processTcpResponse(data);
                         }
-                        else
+                        else if (mqttSocket != NULL && (mqttSocket->state == TCP_SYN_SENT
+                                                     || mqttSocket->state == TCP_ESTABLISHED))
                         {
-                            putsUart0("TCP port is closed\r\n");
-
-                            // for closed ports, send reset response
-                            sendTcpResponse(data, &s, ACK | RST);
+                            putsUart0("Routing to processTcpResponse\r\n");
+                            processTcpResponse(data);
                         }
                     }
 
@@ -649,4 +672,3 @@ void Timer4A_Handler(void)
     //putsUart0("Timer interrupt\n");
     tickIsr();
 }
-
