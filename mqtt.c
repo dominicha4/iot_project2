@@ -117,7 +117,7 @@ void connectMqtt(socket *s)
     uint16_t mqttDataSize = 0;
 
     mqttData[mqttDataSize++] = 0x10;    // Connect
-    mqttData[mqttDataSize++] = 15;      // Remaining length
+    mqttData[mqttDataSize++] = 19;      // Remaining length
     mqttData[mqttDataSize++] = 0x00;    // Protocol name MSB
     mqttData[mqttDataSize++] = 0x04;    // Protocol name LSB
     mqttData[mqttDataSize++] = 'M';
@@ -129,10 +129,14 @@ void connectMqtt(socket *s)
     mqttData[mqttDataSize++] = 0x00;    // Keep alive MSB
     mqttData[mqttDataSize++] = 0x3C;    // Keep alive LSB (60s)
     mqttData[mqttDataSize++] = 0x00;    // Client ID length MSB
-    mqttData[mqttDataSize++] = 0x03;    // Client ID length LSB
-    mqttData[mqttDataSize++] = 'w';
-    mqttData[mqttDataSize++] = 'e';
-    mqttData[mqttDataSize++] = 'b';
+    mqttData[mqttDataSize++] = 0x07;    // Client ID length LSB
+    mqttData[mqttDataSize++] = 'd';
+    mqttData[mqttDataSize++] = 'i';
+    mqttData[mqttDataSize++] = 's';
+    mqttData[mqttDataSize++] = 'p';
+    mqttData[mqttDataSize++] = 'l';
+    mqttData[mqttDataSize++] = 'a';
+    mqttData[mqttDataSize++] = 'y';
 
     uint8_t buffer[1518];
     etherHeader *ether = (etherHeader*) buffer;
