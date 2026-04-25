@@ -18,6 +18,7 @@
 
 #include <stdio.h>
 #include <string.h>
+#include <time.h>
 #include "arp.h"
 #include "tcp.h"
 #include "timer.h"
@@ -213,8 +214,6 @@ void sendTcpPendingMessages(etherHeader *ether)
 //    }
 //}
 
-
-
 void processTcpResponse(etherHeader *ether)
 {
     socket *s = NULL;           // Pointer to matching socket (if found)
@@ -225,7 +224,6 @@ void processTcpResponse(etherHeader *ether)
 
     putsUart0("Entered processTcpResponse\r\n");
 
-
     if (!isTcp(ether)) // Ignore packet if it's not TCP
     {
         putsUart0("Not TCP\n");
@@ -233,9 +231,9 @@ void processTcpResponse(etherHeader *ether)
     }
 
     // Extract both IP and TCP headers
-    ip = (ipHeader*) ether->data;       //points to IP header, which starts at the Ethernet data field
-    ipHeaderLength = ip->size * 4;      //IP header legnth is stored in 32 bit words, so multiply by 4 to get bytes
-    tcp = (tcpHeader*) ((uint8_t*) ip + ipHeaderLength);    //move past the IP header so tcp points to the tcp header
+    ip = (ipHeader*) ether->data; //points to IP header, which starts at the Ethernet data field
+    ipHeaderLength = ip->size * 4; //IP header legnth is stored in 32 bit words, so multiply by 4 to get bytes
+    tcp = (tcpHeader*) ((uint8_t*) ip + ipHeaderLength); //move past the IP header so tcp points to the tcp header
 
     // Extract source and destination ports (convert from network byte order)
     uint16_t srcPort = ntohs(tcp->sourcePort);
@@ -247,8 +245,8 @@ void processTcpResponse(etherHeader *ether)
         if (sockets[i].state != TCP_CLOSED) // Only check active sockets
         {
             // Match local and remote ports
-            if (sockets[i].localPort == dstPort &&
-                sockets[i].remotePort == srcPort)
+            if (sockets[i].localPort == dstPort
+                    && sockets[i].remotePort == srcPort)
             {
                 s = &sockets[i];
                 break;
@@ -277,46 +275,64 @@ void processTcpResponse(etherHeader *ether)
 
             putsUart0("TCP connection established (client)\r\n");
 
-           if (mqttState == MQTT_WAIT_TCP)
-           {
-               mqttState = MQTT_TCP_READY;
-           }
+            if (mqttState == MQTT_WAIT_TCP)
+            {
+                mqttState = MQTT_TCP_READY;
+            }
         }
     }
 
     /***** MQTT PART TO CHECK FOR CONNACK AFTER TCP IS ESTABLISHED *****/
     if (s != NULL && s->state == TCP_ESTABLISHED)
     {
+        uint16_t dataLen = ntohs(ip->length) - (ipHeaderLength + sizeof(tcpHeader));
+        if (dataLen == 0)
+            return;
+        uint8_t *payload = tcp->data;
 
-            uint8_t *payload = tcp->data;
+        if (payload[0] == 0x20)
+        {
+            putsUart0("MQTT CONNACK received\r\n");
 
-            if (payload[0] == 0x20)
+            if (payload[3] == 0x00)
             {
-                putsUart0("MQTT CONNACK received\r\n");
+                putsUart0("MQTT SUCCESS\r\n");
+                mqttConnected = true;
+                mqttState = MQTT_CONNECTED;
 
-                if (payload[3] == 0x00)
-                {
-                    putsUart0("MQTT SUCCESS\r\n");
-                    mqttConnected = true;
-                    mqttState = MQTT_CONNECTED;
+                // Update ack number by the size of the CONNACK payload
+                s->acknowledgementNumber += ntohs(ip->length)
+                        - (ipHeaderLength + sizeof(tcpHeader));
 
-                    // Update ack number by the size of the CONNACK payload
-                    s->acknowledgementNumber += ntohs(ip->length) - (ipHeaderLength + sizeof(tcpHeader));
-
-                    // Send bare ACK back to broker
-                    sendTcpResponse(ether, s, ACK);
-                }
-                else
-                {
-                    putsUart0("MQTT FAILED\r\n");
-                }
-            }
-            if (payload[0] == 0xD0)
-            {
-                putsUart0("MQTT PINGRESP received\r\n");
-                s->acknowledgementNumber += ntohs(ip->length) - (ipHeaderLength + sizeof(tcpHeader));
+                // Send bare ACK back to broker
                 sendTcpResponse(ether, s, ACK);
             }
+            else
+            {
+                putsUart0("MQTT FAILED\r\n");
+            }
+        }
+        else if (payload[0] == 0xD0)
+        {
+            putsUart0("MQTT PINGRESP received\r\n");
+            s->acknowledgementNumber += ntohs(ip->length)
+                    - (ipHeaderLength + sizeof(tcpHeader));
+            sendTcpResponse(ether, s, ACK);
+        }
+        else if (payload[0] == 0x90)  // SUBACK
+        {
+            putsUart0("MQTT SUBACK received\r\n");
+            s->acknowledgementNumber += ntohs(ip->length)
+                    - (ipHeaderLength + sizeof(tcpHeader));
+            sendTcpResponse(ether, s, ACK);
+        }
+        else if ((payload[0] & 0xF0) == 0x30)  // PUBLISH
+        {
+            putsUart0("MQTT PUBLISH received\r\n");
+            s->acknowledgementNumber += ntohs(ip->length)
+                    - (ipHeaderLength + sizeof(tcpHeader));
+            sendTcpResponse(ether, s, ACK);
+        }
 
     }
 }
@@ -518,6 +534,7 @@ void tcpConnect(etherHeader *data, uint16_t port)
 
     putsUart0("Starting TCP connection...\r\n");
 
+    srand(time(NULL));
     s->remotePort = port;
     s->localPort = 50000 + (rand() % 1000);
     s->sequenceNumber = 1;
@@ -527,14 +544,26 @@ void tcpConnect(etherHeader *data, uint16_t port)
     s->remoteIpAddress[0] = 192;
     s->remoteIpAddress[1] = 168;
     s->remoteIpAddress[2] = 1;
-    s->remoteIpAddress[3] = 100;
+    s->remoteIpAddress[3] = 131;
 
-    s->remoteHwAddress[0] = 0x00;
-    s->remoteHwAddress[1] = 0x24;
-    s->remoteHwAddress[2] = 0x32;
-    s->remoteHwAddress[3] = 0xAE;
-    s->remoteHwAddress[4] = 0x5D;
-    s->remoteHwAddress[5] = 0xC6;
+    s->remoteHwAddress[0] = 0x02;
+    s->remoteHwAddress[1] = 0x03;
+    s->remoteHwAddress[2] = 0x04;
+    s->remoteHwAddress[3] = 0x05;
+    s->remoteHwAddress[4] = 0x06;
+    s->remoteHwAddress[5] = 0x83;
+
+//    s->remoteIpAddress[0] = 169;
+//    s->remoteIpAddress[1] = 254;
+//    s->remoteIpAddress[2] = 163;
+//    s->remoteIpAddress[3] = 205;
+//
+//    s->remoteHwAddress[0] = 0x00;
+//    s->remoteHwAddress[1] = 0xe0;
+//    s->remoteHwAddress[2] = 0x4c;
+//    s->remoteHwAddress[3] = 0x68;
+//    s->remoteHwAddress[4] = 0x20;
+//    s->remoteHwAddress[5] = 0xc2;
 
     // Build ethernet header
     uint8_t localMac[6];
@@ -545,13 +574,13 @@ void tcpConnect(etherHeader *data, uint16_t port)
 
     // Build IP header
     ipHeader *ip = (ipHeader*) data->data;
-    ip->rev  = 4;
+    ip->rev = 4;
     ip->size = 5;
-    ip->typeOfService  = 0;
-    ip->id             = 0;
+    ip->typeOfService = 0;
+    ip->id = 0;
     ip->flagsAndOffset = 0;
-    ip->ttl            = 64;
-    ip->protocol       = PROTOCOL_TCP;
+    ip->ttl = 64;
+    ip->protocol = PROTOCOL_TCP;
     ip->headerChecksum = 0;
 
     uint8_t localIp[4];
@@ -561,20 +590,20 @@ void tcpConnect(etherHeader *data, uint16_t port)
 
     // Build TCP header
     uint8_t ipHeaderLength = ip->size * 4;
-    tcpHeader *tcp = (tcpHeader*)((uint8_t*)ip + ipHeaderLength);
-    tcp->sourcePort            = htons(s->localPort);
-    tcp->destPort              = htons(s->remotePort);
-    tcp->sequenceNumber        = htonl(s->sequenceNumber);
+    tcpHeader *tcp = (tcpHeader*) ((uint8_t*) ip + ipHeaderLength);
+    tcp->sourcePort = htons(s->localPort);
+    tcp->destPort = htons(s->remotePort);
+    tcp->sequenceNumber = htonl(s->sequenceNumber);
     tcp->acknowledgementNumber = htonl(0);
-    tcp->offsetFields          = htons((5 << OFS_SHIFT) | SYN);
-    tcp->windowSize            = htons(1024);
-    tcp->urgentPointer         = 0;
-    tcp->checksum              = 0;
+    tcp->offsetFields = htons((5 << OFS_SHIFT) | SYN);
+    tcp->windowSize = htons(1024);
+    tcp->urgentPointer = 0;
+    tcp->checksum = 0;
 
     // IP length and checksum
-    uint16_t tcpLength     = sizeof(tcpHeader);
+    uint16_t tcpLength = sizeof(tcpHeader);
     uint16_t totalIpLength = ipHeaderLength + tcpLength;
-    ip->length         = htons(totalIpLength);
+    ip->length = htons(totalIpLength);
     ip->headerChecksum = 0;
     calcIpChecksum(ip);
 

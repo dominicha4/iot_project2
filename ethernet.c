@@ -60,6 +60,7 @@
 #include <stdio.h>
 #include <string.h>
 #include <ctype.h>
+#include <stdlib.h>
 #include "tm4c123gh6pm.h"
 #include "clock.h"
 #include "eeprom.h"
