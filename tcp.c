@@ -553,17 +553,17 @@ void tcpConnect(etherHeader *data, uint16_t port)
     s->remoteHwAddress[4] = 0x06;
     s->remoteHwAddress[5] = 0x83;
 
-//    s->remoteIpAddress[0] = 169;
-//    s->remoteIpAddress[1] = 254;
-//    s->remoteIpAddress[2] = 163;
-//    s->remoteIpAddress[3] = 205;
+//    s->remoteIpAddress[0] = 10;      //10.232.19.100
+//    s->remoteIpAddress[1] = 232;
+//    s->remoteIpAddress[2] = 19;
+//    s->remoteIpAddress[3] = 100;
 //
-//    s->remoteHwAddress[0] = 0x00;
-//    s->remoteHwAddress[1] = 0xe0;
-//    s->remoteHwAddress[2] = 0x4c;
-//    s->remoteHwAddress[3] = 0x68;
-//    s->remoteHwAddress[4] = 0x20;
-//    s->remoteHwAddress[5] = 0xc2;
+//    s->remoteHwAddress[0] = 0x10;
+//    s->remoteHwAddress[1] = 0xF6;
+//    s->remoteHwAddress[2] = 0x0A;
+//    s->remoteHwAddress[3] = 0x7B;
+//    s->remoteHwAddress[4] = 0x10;
+//    s->remoteHwAddress[5] = 0x4C;
 
     // Build ethernet header
     uint8_t localMac[6];
