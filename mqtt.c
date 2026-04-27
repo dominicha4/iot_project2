@@ -30,6 +30,7 @@ mqttState_t mqttState = MQTT_IDLE;
 socket *mqttSocket = NULL;
 bool mqttConnected = false;     // MQTT connection state
 bool mqttConnectSent = false;   // Used to prevent it from sending another. Maybe used
+mqttRecord_t mqttRecords[MAX_RECORDS] = {};
 
 // ------------------------------------------------------------------------------
 //  Structures
@@ -373,8 +374,98 @@ void subscribeMqtt(char strTopic[])
     putsUart0("MQTT SUBSCRIBE sent\r\n");
 }
 
-
-
 void unsubscribeMqtt(char strTopic[])
 {
+}
+
+void printMqttRecords()
+{
+    putsUart0(RESET_TEXT);      // Clears terminal
+    char buffer[50];
+    sprintf(buffer, "MQTT TOPIC          DATA");
+    PRINT_EFFECT(buffer, BOLD_FONT);
+
+    uint8_t i = 0;
+    while(i < MAX_RECORDS && mqttRecords[i].valid == true)
+    {
+        PRINT_COLOR_FONT(mqttRecords[i].topic, GREEN_FG, UNDERLINE_FONT);
+        putsUart0("     ");
+        putsUart0(mqttRecords[i++].payload);
+        putsUart0("\n\r");
+    }
+}
+
+void printMqttRecords()
+{
+    putsUart0(RESET_TEXT);      // Clears terminal
+
+    char buffer[50];
+    sprintf(buffer, "MQTT TOPIC          DATA\r\n");
+    PRINT_EFFECT(buffer, BOLD_FONT);
+
+    uint8_t i = 0;
+    while (i < MAX_RECORDS && mqttRecords[i].valid == true)  // && not 'and', bounds check first
+    {
+        PRINT_COLOR_FONT(mqttRecords[i].topic, GREEN_FG, UNDERLINE_FONT);  // [i].topic not .topic[i]
+        putsUart0("  ");
+        putsUart0(mqttRecords[i].payload);  // [i].payload, increment i separately
+        putsUart0("\r\n");
+        i++;
+    }
+}
+
+void parseMqttPublish(uint8_t *payload)
+{
+    uint8_t i;
+    int8_t freeSlot = -1;
+
+    // Extract the topic from the payload
+    uint8_t remainingLength = payload[1];
+    uint16_t topicLen = ((uint16_t)payload[2] << 8) | payload[3];
+    if (topicLen >= MAX_TOPIC_LEN)
+        topicLen = MAX_TOPIC_LEN - 1;
+
+    char topic[MAX_TOPIC_LEN];
+    memcpy(topic, &payload[4], topicLen);
+    topic[topicLen] = '\0';
+
+    // Extract the data for the topic from the payload
+    uint16_t dataLen = remainingLength - 2 - topicLen;
+    if (dataLen >= MAX_PAYLOAD_LEN)
+        dataLen = MAX_PAYLOAD_LEN - 1;
+
+    char dataStr[MAX_PAYLOAD_LEN];
+    memcpy(dataStr, &payload[4 + topicLen], dataLen);
+    dataStr[dataLen] = '\0';
+
+    // Search struct for matching topic to update
+    for (i = 0; i < MAX_RECORDS; i++)
+    {
+        if (mqttRecords[i].valid && strcmp(mqttRecords[i].topic, topic) == 0)
+        {
+            // Topic was found. update data and return to avoid adding a dup
+            strncpy(mqttRecords[i].payload, dataStr, MAX_PAYLOAD_LEN - 1);
+            mqttRecords[i].payload[MAX_PAYLOAD_LEN - 1] = '\0';
+            printMqttRecords();
+            return;
+        }
+        if (!mqttRecords[i].valid && freeSlot < 0)
+            freeSlot = i;
+    }
+
+    // If not found, add the data to a free slot if available
+    if (freeSlot >= 0)
+    {
+        strncpy(mqttRecords[freeSlot].topic,   topic,   MAX_TOPIC_LEN - 1);
+        strncpy(mqttRecords[freeSlot].payload, dataStr, MAX_PAYLOAD_LEN - 1);
+        mqttRecords[freeSlot].topic[MAX_TOPIC_LEN - 1]     = '\0';
+        mqttRecords[freeSlot].payload[MAX_PAYLOAD_LEN - 1] = '\0';
+        mqttRecords[freeSlot].valid = true;
+    }
+    else
+    {
+        putsUart0("MQTT record table full — cannot store\r\n");
+    }
+
+    printMqttRecords();
 }

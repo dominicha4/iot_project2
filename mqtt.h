@@ -31,6 +31,18 @@ typedef enum {
     MQTT_CONNECTED
 } mqttState_t;
 
+typedef struct {
+    char topic[MAX_TOPIC_LEN];
+    char payload[MAX_PAYLOAD_LEN];
+    bool valid;
+} mqttRecord_t;
+
+#define MAX_RECORDS 20
+#define MAX_TOPIC_LEN 64
+#define MAX_PAYLOAD_LEN 128
+
+extern mqttRecord_t mqttRecords[MAX_RECORDS];
+
 extern mqttState_t mqttState;
 extern socket *mqttSocket;
 extern bool mqttConnected;     // MQTT connection state
@@ -45,5 +57,7 @@ void disconnectMqtt();
 void publishMqtt(char strTopic[], char strData[]);
 void subscribeMqtt(char strTopic[]);
 void unsubscribeMqtt(char strTopic[]);
+void printMqttRecords();
+void parseMqttPublish(uint8_t *payload);
 
 #endif
