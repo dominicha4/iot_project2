@@ -100,120 +100,6 @@ void sendTcpPendingMessages(etherHeader *ether)
 {
 }
 
-//void processTcpResponse(etherHeader *ether)
-//{
-//    socket *s = NULL; //make a socket pointer and start it as null in case no socket is found
-//    ipHeader *ip; //pointer that will point to UP header inside the Ethernet frame
-//    tcpHeader *tcp; //pointer that will point to the TCP header after the IP header
-//    uint8_t ipHeaderLength; //variable for the actual size of Ip header in bytes
-//    uint8_t i;                 //loop variable for searching through socket list
-//
-//    putsUart0("Entered processTcpResponse\r\n");
-//
-//    if (!isTcp(ether))
-//    {
-//        putsUart0("Not TCP\n");
-//        return;                 //check if packet is TCP packet
-//    }
-//
-//    if (!isTcpPortOpen(ether)) //if TCP packet is not going to open port, then ignore it
-//    {
-//        putsUart0("TCP port not open\n");
-//        return;
-//    }
-//
-//    ip = (ipHeader*) ether->data; //points to IP header, which starts at the Ethernet data field
-//    ipHeaderLength = ip->size * 4; //IP header legnth is stored in 32 bit words, so multiply by 4 to get bytes
-//    tcp = (tcpHeader*) ((uint8_t*) ip + ipHeaderLength); //move past the IP header so tcp points to the tcp header
-//
-//    // Extracts source and destination TCP ports from incoming packets
-//    uint16_t srcPort = ntohs(tcp->sourcePort);
-//    uint16_t dstPort = ntohs(tcp->destPort);
-//
-//    for (i = 0; i < MAX_SOCKETS; i++)   // Iterate and finds the matching TCP socket
-//    {
-//        if (sockets[i].state != TCP_CLOSED) // Skips invalid sockets
-//        {
-//            // Checks for matching source and destination port
-//            if (sockets[i].localPort == dstPort &&
-//                sockets[i].remotePort == srcPort)
-//            {
-//                s = &sockets[i];
-//                break;
-//            }
-//        }
-//    }
-//    //checks for the first step of TCP, client sends SYN and is trying to start a new connection
-//    if (isTcpSyn(ether) && !isTcpAck(ether))
-//    {
-//        putsUart0("TCP SYN received\r\n");
-//
-//        s = newSocket(); //use an unused socket so we can track new TCP connection
-//        if (s == NULL) //if no free socket available, leave becuase we have nowhere to store the new connection
-//        {
-//            putsUart0("No free socket\r\n");
-//            return;
-//        }
-//
-//        putsUart0("Socket allocated\r\n");
-//
-//        //function socket.c
-//        getSocketInfoFromTcpPacket(ether, s); //copy client IP, MAC, source port and destination port into socket
-//        putsUart0("Socket info copied\r\n");
-//
-//        s->sequenceNumber = 1; //choose a starting sequenct number for our side of TCP connection
-//        s->acknowledgementNumber = ntohl(tcp->sequenceNumber) + 1; //client sent us a SYN with its own sequence number
-//        s->state = TCP_SYN_RECEIVED; //we are now in SYN_RECEIVED state becasue we got SYN and will reply with SYN+ACK
-//        putsUart0("Sending SYN+ACK\r\n");
-//        sendTcpResponse(ether, s, SYN | ACK); // send SYN and ACK back to client as step 2 of handshake
-//
-//        s->sequenceNumber++;    //SYN consumes one sequence number
-//    }
-//    //this checks for the last step of TCP handshake, client sends ack after receiving our SYN+ACK
-//    else if (isTcpAck(ether) && !isTcpSyn(ether))
-//    {
-//        putsUart0("Final ACK received\r\n");
-//
-//        for (i = 0; i < MAX_SOCKETS; i++)
-//        {
-//            if (sockets[i].state == TCP_SYN_RECEIVED) //only chekcs sockets that are waiting for the final ACK
-//            {
-//                if ((sockets[i].localPort == ntohs(tcp->destPort))
-//                        && (sockets[i].remotePort == ntohs(tcp->sourcePort)))
-//                {
-//                    sockets[i].state = TCP_ESTABLISHED; //handshake is done, so mark this socket as connected
-//                    putsUart0("TCP connection established\r\n");
-//                    break;    //stop searching becuase we found the right socket
-//                }
-//            }
-//        }
-//    }
-//
-//    // If TCP connect has been established, check socket for MQTT CONNACK
-//    if(s != NULL && s->state == TCP_ESTABLISHED)
-//    {
-//        if(tcp->sourcePort == htons(s->remotePort))
-//        {
-//            uint8_t *payload = tcp->data;
-//
-//            if(payload[0] == 0x20) // If MQTT CONNACK has been received
-//            {
-//                putsUart0("MQTT CONNACK received\r\n");
-//
-//                if(payload[3] == 0x00) // Check for success
-//                {
-//                    putsUart0("MQTT SUCCESS\r\n");
-//                    mqttConnected = true; // optional safety lock
-//                }
-//                else    // Otherwise, failed
-//                {
-//                    putsUart0("MQTT FAILED\r\n");
-//                }
-//            }
-//        }
-//    }
-//}
-
 void processTcpResponse(etherHeader *ether)
 {
     socket *s = NULL;           // Pointer to matching socket (if found)
@@ -222,7 +108,7 @@ void processTcpResponse(etherHeader *ether)
     uint8_t ipHeaderLength;     // Length of IP header in bytes
     uint8_t i;                  // Loop variable for socket search
 
-    putsUart0("Entered processTcpResponse\r\n");
+    //putsUart0("Entered processTcpResponse\r\n");
 
     if (!isTcp(ether)) // Ignore packet if it's not TCP
     {
@@ -332,6 +218,15 @@ void processTcpResponse(etherHeader *ether)
             s->acknowledgementNumber += ntohs(ip->length)
                     - (ipHeaderLength + sizeof(tcpHeader));
             sendTcpResponse(ether, s, ACK);
+
+            parseMqttPublish(payload);
+        }
+        else if (payload[0] == 0xB0)  // UNSUBACK
+        {
+            putsUart0("MQTT UNSUBACK received\r\n");
+            s->acknowledgementNumber += ntohs(ip->length)
+                    - (ipHeaderLength + sizeof(tcpHeader));
+            sendTcpResponse(ether, s, ACK);
         }
 
     }
@@ -382,7 +277,7 @@ bool isTcpPortOpen(etherHeader *ether)
 
 void sendTcpResponse(etherHeader *ether, socket *s, uint16_t flags)
 {
-    putsUart0("Entered sendTcpResponse\r\n");
+    //putsUart0("Entered sendTcpResponse\r\n");
     sendTcpMessage(ether, s, flags, NULL, 0); //send TCP response packet with no payload data
 }
 
@@ -401,7 +296,7 @@ void sendTcpMessage(etherHeader *ether, socket *s, uint16_t flags,
     uint16_t protocolField; //used when adding protocol to pseudo header
     uint16_t tcpLengthField; //used when adding TCP length to pseudo header
 
-    putsUart0("Entered sendTcpMessage\r\n");
+    //putsUart0("Entered sendTcpMessage\r\n");
 
     //swap destination and source MAC addresses so packet goes back to sender
     uint8_t tempMac[6];
@@ -487,42 +382,6 @@ void sendTcpMessage(etherHeader *ether, socket *s, uint16_t flags,
     putsUart0("TCP packet sent\r\n");
 }
 
-//void tcpConnect(etherHeader *data, uint16_t port)
-//{
-//    socket *s = newSocket();    // Allocates a free socket
-//    if (s == NULL)  // If no sockets are available or fails (safety check)
-//    {
-//        putsUart0("No free socket for TCP connect\r\n");
-//        return;
-//    }
-//
-//    putsUart0("Starting TCP connection...\r\n");
-//
-//    // Set destination port to 1883 for mqtt
-//    s->remotePort = port;
-//    // Chooses a random high number
-//    s->localPort = 50000 + (rand() % 1000);   // random high port
-//
-//    s->sequenceNumber = 1;      // Initial sequence
-//    s->acknowledgementNumber = 0;
-//    s->state = TCP_SYN_SENT;
-//    s->remoteIpAddress[0] = 192;
-//    s->remoteIpAddress[1] = 168;
-//    s->remoteIpAddress[2] = 1;
-//    s->remoteIpAddress[3] = 100;
-//
-//    s->remoteHwAddress[0] = 0x00;
-//    s->remoteHwAddress[1] = 0x24;
-//    s->remoteHwAddress[2] = 0x32;
-//    s->remoteHwAddress[3] = 0xAE;
-//    s->remoteHwAddress[4] = 0x5D;
-//    s->remoteHwAddress[5] = 0xC6;
-//
-//    // Send TCPSYN to initiate 3 way handshake
-//    sendTcpMessage(data, s, SYN, NULL, 0);
-//
-//    putsUart0("SYN sent\r\n");
-//}
 void tcpConnect(etherHeader *data, uint16_t port)
 {
     socket *s = newSocket();
@@ -541,24 +400,24 @@ void tcpConnect(etherHeader *data, uint16_t port)
     s->acknowledgementNumber = 0;
     s->state = TCP_SYN_SENT;
 
-    s->remoteIpAddress[0] = 192;
+    s->remoteIpAddress[0] = 192;    // Sean's IP address
     s->remoteIpAddress[1] = 168;
     s->remoteIpAddress[2] = 1;
     s->remoteIpAddress[3] = 131;
 
-    s->remoteHwAddress[0] = 0x02;
+    s->remoteHwAddress[0] = 0x02;   // Sean's MAC Address
     s->remoteHwAddress[1] = 0x03;
     s->remoteHwAddress[2] = 0x04;
     s->remoteHwAddress[3] = 0x05;
     s->remoteHwAddress[4] = 0x06;
     s->remoteHwAddress[5] = 0x83;
 
-//    s->remoteIpAddress[0] = 10;      //10.232.19.100
+//    s->remoteIpAddress[0] = 10;   // My IP when using mosquitto for broker
 //    s->remoteIpAddress[1] = 232;
 //    s->remoteIpAddress[2] = 19;
 //    s->remoteIpAddress[3] = 100;
 //
-//    s->remoteHwAddress[0] = 0x10;
+//    s->remoteHwAddress[0] = 0x10; // My MAC when using mosquitto for broker
 //    s->remoteHwAddress[1] = 0xF6;
 //    s->remoteHwAddress[2] = 0x0A;
 //    s->remoteHwAddress[3] = 0x7B;

@@ -376,42 +376,117 @@ void subscribeMqtt(char strTopic[])
 
 void unsubscribeMqtt(char strTopic[])
 {
+    if (mqttSocket == NULL || mqttSocket->state != TCP_ESTABLISHED)
+        return;
+
+    uint8_t mqttData[200] = {};
+    uint16_t mqttDataSize = 0;
+    uint16_t topicLen = strlen(strTopic);
+    uint8_t remainingLength = 2 + 2 + topicLen;   // packet ID (2) + topic length field (2) + topic
+
+    mqttData[mqttDataSize++] = 0xA2;                        // UNSUBSCRIBE, QoS 1
+    mqttData[mqttDataSize++] = remainingLength;
+    mqttData[mqttDataSize++] = 0x00;                        // Packet ID MSB
+    mqttData[mqttDataSize++] = 0x02;                        // Packet ID LSB (different from subscribe)
+    mqttData[mqttDataSize++] = (topicLen >> 8) & 0xFF;      // Topic length MSB
+    mqttData[mqttDataSize++] = topicLen & 0xFF;             // Topic length LSB
+    memcpy(&mqttData[mqttDataSize], strTopic, topicLen);
+    mqttDataSize += topicLen;
+    // Note: no QoS byte at the end unlike SUBSCRIBE
+
+    uint8_t buffer[1518];
+    etherHeader *ether = (etherHeader*) buffer;
+
+    uint8_t localMac[6];
+    getEtherMacAddress(localMac);
+    memcpy(ether->destAddress, mqttSocket->remoteHwAddress, 6);
+    memcpy(ether->sourceAddress, localMac, 6);
+    ether->frameType = htons(0x0800);
+
+    ipHeader *ip = (ipHeader*) ether->data;
+    ip->rev            = 4;
+    ip->size           = 5;
+    ip->typeOfService  = 0;
+    ip->id             = 0;
+    ip->flagsAndOffset = 0;
+    ip->ttl            = 64;
+    ip->protocol       = PROTOCOL_TCP;
+    ip->headerChecksum = 0;
+
+    uint8_t localIp[4];
+    getIpAddress(localIp);
+    memcpy(ip->sourceIp, localIp, 4);
+    memcpy(ip->destIp, mqttSocket->remoteIpAddress, 4);
+
+    uint8_t ipHeaderLength = ip->size * 4;
+    tcpHeader *tcp = (tcpHeader*)((uint8_t*)ip + ipHeaderLength);
+    tcp->sourcePort            = htons(mqttSocket->localPort);
+    tcp->destPort              = htons(mqttSocket->remotePort);
+    tcp->sequenceNumber        = htonl(mqttSocket->sequenceNumber);
+    tcp->acknowledgementNumber = htonl(mqttSocket->acknowledgementNumber);
+    tcp->offsetFields          = htons((5 << OFS_SHIFT) | PSH | ACK);
+    tcp->windowSize            = htons(1024);
+    tcp->urgentPointer         = 0;
+    tcp->checksum              = 0;
+
+    memcpy(tcp->data, mqttData, mqttDataSize);
+
+    uint16_t tcpLength     = sizeof(tcpHeader) + mqttDataSize;
+    uint16_t totalIpLength = ipHeaderLength + tcpLength;
+    ip->length         = htons(totalIpLength);
+    ip->headerChecksum = 0;
+    calcIpChecksum(ip);
+
+    uint32_t sum = 0;
+    uint16_t protocolField  = htons(ip->protocol);
+    uint16_t tcpLengthField = htons(tcpLength);
+    sumIpWords(ip->sourceIp, 4, &sum);
+    sumIpWords(ip->destIp, 4, &sum);
+    sumIpWords(&protocolField, 2, &sum);
+    sumIpWords(&tcpLengthField, 2, &sum);
+    sumIpWords(tcp, tcpLength, &sum);
+    tcp->checksum = getIpChecksum(sum);
+
+    putEtherPacket(ether, sizeof(etherHeader) + totalIpLength);
+
+    mqttSocket->sequenceNumber += mqttDataSize;
+
+    // Remove the topic from the local records table
+    uint8_t i;
+    for (i = 0; i < MAX_RECORDS; i++)
+    {
+        if (mqttRecords[i].valid && strcmp(mqttRecords[i].topic, strTopic) == 0)
+        {
+            mqttRecords[i].valid = false;
+            memset(mqttRecords[i].topic,   0, MAX_TOPIC_LEN);
+            memset(mqttRecords[i].payload, 0, MAX_PAYLOAD_LEN);
+            break;
+        }
+    }
+
+    putsUart0("MQTT UNSUBSCRIBE sent\r\n");
+    printMqttRecords();
 }
 
 void printMqttRecords()
 {
     putsUart0(RESET_TEXT);      // Clears terminal
-    char buffer[50];
-    sprintf(buffer, "MQTT TOPIC          DATA");
+    putsUart0("\n\n\r");
+    char buffer[100];
+    char topicTitle[] = "MQTT TOPIC";
+    char dataTitle[] = "DATA";
+    sprintf(buffer, "%-25s%-10s\n\r", topicTitle, dataTitle);
     PRINT_EFFECT(buffer, BOLD_FONT);
 
     uint8_t i = 0;
     while(i < MAX_RECORDS && mqttRecords[i].valid == true)
     {
-        PRINT_COLOR_FONT(mqttRecords[i].topic, GREEN_FG, UNDERLINE_FONT);
-        putsUart0("     ");
-        putsUart0(mqttRecords[i++].payload);
-        putsUart0("\n\r");
+        sprintf(buffer, "%-25s", mqttRecords[i].topic);
+        PRINT_COLOR_FONT(buffer, GREEN_FG, UNDERLINE_FONT);
+        sprintf(buffer, "%-10s\n\r", mqttRecords[i++].payload);
+        putsUart0(buffer);
     }
-}
-
-void printMqttRecords()
-{
-    putsUart0(RESET_TEXT);      // Clears terminal
-
-    char buffer[50];
-    sprintf(buffer, "MQTT TOPIC          DATA\r\n");
-    PRINT_EFFECT(buffer, BOLD_FONT);
-
-    uint8_t i = 0;
-    while (i < MAX_RECORDS && mqttRecords[i].valid == true)  // && not 'and', bounds check first
-    {
-        PRINT_COLOR_FONT(mqttRecords[i].topic, GREEN_FG, UNDERLINE_FONT);  // [i].topic not .topic[i]
-        putsUart0("  ");
-        putsUart0(mqttRecords[i].payload);  // [i].payload, increment i separately
-        putsUart0("\r\n");
-        i++;
-    }
+    putsUart0("\n\n\r");
 }
 
 void parseMqttPublish(uint8_t *payload)
@@ -467,5 +542,6 @@ void parseMqttPublish(uint8_t *payload)
         putsUart0("MQTT record table full — cannot store\r\n");
     }
 
+    PRINT_COLOR_FONT("PRINTING DATA\n\n\r", RED_FG, BOLD_FONT);
     printMqttRecords();
 }

@@ -23,6 +23,10 @@
 #include <stdbool.h>
 #include "tcp.h"
 
+#define MAX_RECORDS 20
+#define MAX_TOPIC_LEN 64
+#define MAX_PAYLOAD_LEN 128
+
 typedef enum {
     MQTT_IDLE,
     MQTT_WAIT_TCP,
@@ -36,10 +40,6 @@ typedef struct {
     char payload[MAX_PAYLOAD_LEN];
     bool valid;
 } mqttRecord_t;
-
-#define MAX_RECORDS 20
-#define MAX_TOPIC_LEN 64
-#define MAX_PAYLOAD_LEN 128
 
 extern mqttRecord_t mqttRecords[MAX_RECORDS];
 

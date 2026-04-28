@@ -131,7 +131,7 @@ void displayConnectionInfo()
         if (i < HW_ADD_LENGTH-1)
             putcUart0(':');
     }
-    putcUart0('\n');
+    putsUart0("\n\r");
     getIpAddress(ip);
     putsUart0("  IP:    ");
     for (i = 0; i < IP_ADD_LENGTH; i++)
@@ -145,7 +145,7 @@ void displayConnectionInfo()
         putsUart0(" (dhcp)");
     else
         putsUart0(" (static)");
-    putcUart0('\n');
+    putsUart0("\n\r");
     getIpSubnetMask(ip);
     putsUart0("  SN:    ");
     for (i = 0; i < IP_ADD_LENGTH; i++)
@@ -155,7 +155,7 @@ void displayConnectionInfo()
         if (i < IP_ADD_LENGTH-1)
             putcUart0('.');
     }
-    putcUart0('\n');
+    putsUart0("\n\r");
     getIpGatewayAddress(ip);
     putsUart0("  GW:    ");
     for (i = 0; i < IP_ADD_LENGTH; i++)
@@ -165,7 +165,7 @@ void displayConnectionInfo()
         if (i < IP_ADD_LENGTH-1)
             putcUart0('.');
     }
-    putcUart0('\n');
+    putsUart0("\n\r");
     getIpDnsAddress(ip);
     putsUart0("  DNS:   ");
     for (i = 0; i < IP_ADD_LENGTH; i++)
@@ -175,7 +175,7 @@ void displayConnectionInfo()
         if (i < IP_ADD_LENGTH-1)
             putcUart0('.');
     }
-    putcUart0('\n');
+    putsUart0("\n\r");
     getIpTimeServerAddress(ip);
     putsUart0("  Time:  ");
     for (i = 0; i < IP_ADD_LENGTH; i++)
@@ -185,7 +185,7 @@ void displayConnectionInfo()
         if (i < IP_ADD_LENGTH-1)
             putcUart0('.');
     }
-    putcUart0('\n');
+    putsUart0("\n\r");
     getIpMqttBrokerAddress(ip);
     putsUart0("  MQTT:  ");
     for (i = 0; i < IP_ADD_LENGTH; i++)
@@ -195,7 +195,7 @@ void displayConnectionInfo()
         if (i < IP_ADD_LENGTH-1)
             putcUart0('.');
     }
-    putcUart0('\n');
+    putsUart0("\n\r");
     if (isDhcpEnabled())
     {
         putsUart0("  Lease: ");
@@ -521,7 +521,7 @@ int main(void)
     initEeprom();
     readConfiguration();
 
-    putsUart0("\rDHCP Enabled? ");
+    //putsUart0("\rDHCP Enabled? ");
     if (isDhcpEnabled())
         putsUart0("YES\n");
     else
@@ -598,7 +598,7 @@ int main(void)
             // only go into this block if the packet is a valid IP packet
             if (isIp(data))
             {
-                putsUart0("IP packet seen\r\n");
+                //putsUart0("IP packet seen\r\n");
 
                 // only handle traffic addressed directly to our board
                 if (isIpUnicast(data))
@@ -615,7 +615,7 @@ int main(void)
                     // TCP testing block
                     if (isTcp(data))
                     {
-                        putsUart0("TCP packet seen\r\n");
+                        //putsUart0("TCP packet seen\r\n");
 
 //                        // print if SYN flag is set
 //                        if (isTcpSyn(data))
